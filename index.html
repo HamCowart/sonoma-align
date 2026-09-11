@@ -394,6 +394,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="btnrow" style="margin-top:10px">
         <button class="btn" id="btnToeModeF">Front only</button>
         <button class="btn sel" id="btnToeModeA">All 4 wheels</button>
+        <button class="btn" id="btnToeModeX">+ Frame rails</button>
       </div>
       <p class="small" style="margin-top:6px" id="toeModeNote">All-4 measures front toe, rear toe, and references the fronts to the rear axle — needed for steering-wheel centering.</p>
       <div class="btnrow" style="margin-top:8px">
@@ -406,7 +407,16 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <thead><tr><th>#</th><th>Front</th><th>Rear</th><th>LF/RF split</th><th>Drift</th><th></th></tr></thead><tbody></tbody>
       </table></div>
       <div class="hint" id="toeAvg" style="margin-top:6px"></div>
+      <div id="frameBlock" style="display:none;margin-top:10px" class="hint"><div id="frameOut"></div></div>
       <div class="note warn" style="margin-top:8px">Toe tolerances are about a tenth of a degree — the edge of what a phone gyro does. Run <b>3 passes</b> and trust the average; sanity-check with the tape method before final tightening.</div>
+    </div>
+
+    <div class="card">
+      <h2>Frame centerline <span class="small" style="text-transform:none">(optional cross-check)</span></h2>
+      <p class="hint">A truck's frame rails are manufactured straight and parallel to its true centerline — the same reference collision/frame shops use to check for impact damage. Pressing the phone against a straight, undamaged section of <b>each</b> rail and comparing headings gives a second, independent "straight ahead" — separate from the rear axle, useful for catching a subtly bent frame or an offset rear axle before you trust the thrust line completely.</p>
+      <p class="hint" style="margin-top:6px">Pick the <b>front and rear frame check-points</b> — usually the flat rail sections just behind the front bumper and just ahead of the rear bumper — because on a Sonoma-style ladder frame those are normally reachable from outside the truck, no jack stands needed. Avoid any kicked-up, notched, or visibly bent section.</p>
+      <p class="hint" style="margin-top:6px">No gauge bar needed here — case off, hold the bare phone flat against the rail's outer face, screen up, top of the phone pointing toward the truck's front, same as a wheel capture.</p>
+      <p class="hint" style="margin-top:6px">Run <b>+ Frame rails</b> mode above. It measures each rail front-to-rear first (a built-in straightness check — a bent rail flags itself before it can mislead you), then reports the frame centerline against the thrust line already captured in the same pass.</p>
     </div>
 
     <div class="card">
@@ -681,6 +691,19 @@ function toeReduce(stations){
     const thrust=(c.LR+c.RR)/2;
     out.lf=thrust-c.LF; out.rf=c.RF-thrust;
   }
+  // Frame rail centerline check. Lf/Lr = left rail, front/rear point; Rf/Rr =
+  // right rail. Both are captured in this SAME continuous carry, so their
+  // headings live in the exact ψ frame as the thrust-line stations above —
+  // no separate pass or bridging needed for a direct comparison.
+  if("Lf" in c&&"Lr" in c&&"Rf" in c&&"Rr" in c){
+    // front-to-rear heading change along each rail; ≈0 for a straight rail —
+    // a real per-vehicle check of the "rails are parallel to centerline"
+    // assumption, not just an assumption taken on faith.
+    out.railStraightL=c.Lr-c.Lf;
+    out.railStraightR=c.Rr-c.Rf;
+    out.centerline=(c.Lf+c.Lr+c.Rf+c.Rr)/4;
+    if("LR" in c&&"RR" in c)out.centerlineVsThrust=out.centerline-(c.LR+c.RR)/2;
+  }
   return out;
 }
 window.__align={zeroFrom,floorFrom,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
@@ -738,7 +761,7 @@ const S={
   sess:store.get("sess2",null),
   past:store.get("past",[])
 };
-function blankSess(){return{started:Date.now(),veh:S.veh,cam:{},cas:{},toeF:null,toeR:null,toeLF:null,toeRF:null,toeMethod:null};}
+function blankSess(){return{started:Date.now(),veh:S.veh,cam:{},cas:{},toeF:null,toeR:null,toeLF:null,toeRF:null,toeMethod:null,frameCenterline:null,frameVsThrust:null,railStraightL:null,railStraightR:null};}
 if(!S.sess)S.sess=blankSess();
 function saveSess(){store.set("sess2",S.sess);}
 function prof(){return PROFILES[S.veh]||PROFILES.custom;}
@@ -1162,13 +1185,20 @@ function casUI(){
 
 /* ---------- toe: gyro carry ---------- */
 const toe={run:false,mode:store.get("toeMode","all"),idx:0,stations:[],passes:store.get("toePasses2",[])};
-const TOE_SEQ={front:["RF","LF","RF"],all:["RF","LF","LR","RR","RF"]};
+const TOE_SEQ={
+  front:["RF","LF","RF"],
+  all:["RF","LF","LR","RR","RF"],
+  frame:["RF","LF","LR","RR","Lf","Lr","Rr","Rf","RF"]
+};
 function toeSeq(){return TOE_SEQ[toe.mode];}
 function toeSetMode(m){toe.mode=m;store.set("toeMode",m);
   $("btnToeModeF").classList.toggle("sel",m==="front");
   $("btnToeModeA").classList.toggle("sel",m==="all");
+  $("btnToeModeX").classList.toggle("sel",m==="frame");
   $("toeModeNote").textContent=m==="all"
     ?"All-4 measures front toe, rear toe, and references the fronts to the rear axle — needed for steering-wheel centering."
+    :m==="frame"
+    ?"Frame check does everything All-4 does, then continues to both frame rails — an independent centerline reference, cross-checked against the rear-axle thrust line, with a built-in straightness check. Longer pass, most complete."
     :"Front-only is quicker: total front toe with drift correction, no thrust-line reference.";
 }
 function toeStart(){
@@ -1204,8 +1234,19 @@ async function toeCapture(){
     $("toeState").innerHTML="Pass complete. Run another for a better average (3 recommended).";
   }else{
     const nxt=seq[toe.idx];
-    const where={LF:"around the front bumper to <b>LF</b>",LR:"down the driver side to <b>LR</b>",RR:"across the back to <b>RR</b>",RF:(toe.mode==="all"?"up the passenger side back to <b>RF</b> (drift check)":"back around to <b>RF</b> (drift check)")}[nxt];
-    $("toeState").innerHTML="Tracking ✓ — carry "+where+", seat it (top toward the bumper), hold still, <b>Capture</b>.";
+    const closureWhere={front:"back around to <b>RF</b> (drift check)",all:"up the passenger side back to <b>RF</b> (drift check)",frame:"forward along the right rail back to <b>RF</b> (drift check)"}[toe.mode];
+    const where={
+      LF:"around the front bumper to <b>LF</b>",
+      LR:"down the driver side to <b>LR</b>",
+      RR:"across the back to <b>RR</b>",
+      Lf:"to the <b>left frame rail</b>, a flat spot just behind the front bumper (ahead of the left front wheel) — bare phone (case off), pressed flat against the rail's outer face, still screen up / top toward the front",
+      Lr:"back along the <b>left rail</b> to a flat spot just ahead of the rear bumper (behind the left rear wheel) — same flush-against-the-rail, top-toward-front hold",
+      Rr:"across to the matching spot on the <b>right rail</b>, just ahead of the rear bumper",
+      Rf:"forward along the <b>right rail</b> to the flat spot just behind the front bumper",
+      RF:closureWhere
+    }[nxt];
+    const onRail=(nxt==="Lf"||nxt==="Lr"||nxt==="Rr"||nxt==="Rf");
+    $("toeState").innerHTML="Tracking ✓ — carry "+where+(onRail?"":", seat it (top toward the bumper)")+", hold still, <b>Capture</b>.";
   }
 }
 function toeResetPasses(){toe.passes=[];store.set("toePasses2",[]);toe.run=false;toe.idx=0;sensor.yawRun=false;$("btnToeCap").disabled=true;$("toeState").textContent="Not running.";toeRender();}
@@ -1213,7 +1254,7 @@ function toeAgg(){
   const P=toe.passes;
   if(!P.length)return null;
   const agg={n:P.length};
-  for(const k of["front","rear","lf","rf"]){
+  for(const k of["front","rear","lf","rf","railStraightL","railStraightR","centerline","centerlineVsThrust"]){
     const vals=P.map(p=>p[k]).filter(v=>v!=null&&!isNaN(v));
     if(vals.length){agg[k]=vals.reduce((a,b)=>a+b,0)/vals.length;
       agg[k+"Sd"]=vals.length>1?Math.sqrt(vals.reduce((a,v)=>a+(v-agg[k])**2,0)/(vals.length-1)):null;}
@@ -1235,12 +1276,29 @@ function toeRender(){
     if(a.rear!=null)h+=` · rear ${fmt(a.rear)}°`+(a.rearSd!=null?` ±${a.rearSd.toFixed(2)}`:"");
     if(a.lf!=null)h+=`<br>vs thrust line: LF ${fmt(a.lf)}° · RF ${fmt(a.rf)}° (equal halves = centered steering)`;
     $("toeAvg").innerHTML=h;
+    $("frameBlock").style.display=(a.centerline!=null)?"block":"none";
+    if(a.centerline!=null){
+      const badL=Math.abs(a.railStraightL)>0.6, badR=Math.abs(a.railStraightR)>0.6;
+      let fh=`<b>Frame centerline</b> (avg of ${a.n}): straightness — left rail ${fmt(a.railStraightL)}°, right rail ${fmt(a.railStraightR)}° (both should sit near 0°)`;
+      if(badL||badR){
+        fh+=`<div class="note warn" style="margin-top:8px"><b>One or both rails read bent</b> (over ~0.6°) — don't trust the centerline number below until you check for frame damage or re-measure with cleaner, flatter reference points on each rail.</div>`;
+      }else{
+        fh+=`<div style="margin-top:6px">vs rear-axle thrust line: <b>${fmt(a.centerlineVsThrust)}°</b>`+(a.centerlineVsThrustSd!=null?` ±${a.centerlineVsThrustSd.toFixed(2)}`:"")+`</div>`;
+        fh+=`<div class="small" style="margin-top:2px">`+(Math.abs(a.centerlineVsThrust)<0.3
+          ?"Frame and rear axle agree — the thrust line is a trustworthy square-up reference for front toe."
+          :"Frame and rear-axle thrust line disagree by more than the usual noise floor — could mean the rear axle sits slightly offset in the frame (common, often harmless) or a past impact. Worth knowing before you square the fronts strictly to the thrust line.")+`</div>`;
+      }
+      $("frameOut").innerHTML=fh;
+      S.sess.frameCenterline=a.centerline;
+      S.sess.frameVsThrust=a.centerlineVsThrust!=null?a.centerlineVsThrust:null;
+      S.sess.railStraightL=a.railStraightL;S.sess.railStraightR=a.railStraightR;
+    }
     S.sess.toeF=a.front!=null?a.front:S.sess.toeF;
     S.sess.toeR=a.rear!=null?a.rear:S.sess.toeR;
     S.sess.toeLF=a.lf!=null?a.lf:null;
     S.sess.toeRF=a.rf!=null?a.rf:null;
     S.sess.toeMethod="gyro";saveSess();renderResults();
-  }else $("toeAvg").textContent="";
+  }else{$("toeAvg").textContent="";$("frameBlock").style.display="none";}
 }
 function toeInches(deg){return (deg==null||isNaN(deg))?"–":(Math.tan(R(deg))*spec().tire).toFixed(2).replace("-0.00","0.00");}
 
@@ -1336,6 +1394,7 @@ function reportText(){
   if(S.sess.toeLF!=null)L.push("F toe vs thrust  LF "+fmt(S.sess.toeLF)+"°  RF "+fmt(S.sess.toeRF)+"°");
   L.push("R camber  LR "+(c.LR?fmt(c.LR.corrected)+"°":"–")+"  RR "+(c.RR?fmt(c.RR.corrected)+"°":"–")+"  (spec "+fmt(sp.rcam)+" ±"+sp.rcamT+")");
   L.push("R toe     "+(S.sess.toeR!=null?fmt(S.sess.toeR)+"° total":"–")+"  (spec "+fmt(sp.rtoe)+" ±"+sp.rtoeT+")");
+  if(S.sess.frameCenterline!=null)L.push("Frame centerline vs thrust  "+fmt(S.sess.frameVsThrust)+"°  (rail straightness L "+fmt(S.sess.railStraightL)+"° R "+fmt(S.sess.railStraightR)+"°)");
   return L.join("\n");
 }
 async function copyReport(){const txt=reportText();try{await navigator.clipboard.writeText(txt);toast("Report copied");}catch(e){prompt("Copy this:",txt);}}
@@ -1475,6 +1534,7 @@ $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casterAbort);
 $("btnToeModeF").addEventListener("click",()=>toeSetMode("front"));
 $("btnToeModeA").addEventListener("click",()=>toeSetMode("all"));
+$("btnToeModeX").addEventListener("click",()=>toeSetMode("frame"));
 $("btnToeStart").addEventListener("click",toeStart);
 $("btnToeCap").addEventListener("click",toeCapture);
 $("btnToeReset").addEventListener("click",toeResetPasses);
