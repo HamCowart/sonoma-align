@@ -227,8 +227,14 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <h2>2 · Flat check <span class="small" style="text-transform:none;letter-spacing:0">(15 seconds, once per phone)</span></h2>
-      <p class="hint">Teaches the app which way your phone’s sensors point. Lay the phone <b>flat on a table, screen up</b>, tap the button, hold still — then when asked, spin it a <b>quarter turn counter-clockwise</b> while it stays flat on the table.</p>
+      <p class="hint">Teaches the app which way your phone’s sensors point. Lay the phone <b>flat on a table, screen up</b>, tap the button, hold still — then when asked, spin it <b>at least a quarter turn</b> either direction (looking down at the screen) while it stays flat on the table, then tap <b>Done spinning</b>.</p>
       <div style="margin-top:10px"><button class="btn big" id="btnFlatCheck">Start flat check</button></div>
+      <div class="mono" id="flatSpinReadout" style="display:none;text-align:center;font-size:34px;font-weight:600;color:var(--acc);margin-top:10px">0°</div>
+      <div style="margin-top:8px"><button class="btn primary big" id="btnFlatDone" style="display:none">Done spinning</button></div>
+      <div class="btnrow" id="flatDirRow" style="display:none;margin-top:8px">
+        <button class="btn" id="btnFlatCCW">↺ I turned it LEFT</button>
+        <button class="btn" id="btnFlatCW">↻ I turned it RIGHT</button>
+      </div>
       <div class="hint" id="flatState" style="margin-top:8px"></div>
     </div>
 
@@ -813,24 +819,71 @@ function refreshDiag(){
 }
 setInterval(refreshDiag,900);
 
-/* ---------- flat check ---------- */
+/* ---------- flat check ----------
+   Rewritten after a real-device report ("doesn't recognize when I turn the
+   phone") — the old version was a blind 5s timer with zero feedback, so a
+   user had no way to tell a slow/late turn from a genuinely dead sensor,
+   and no reaction time before the window started. Now: live readout of
+   sensed rotation (proves the sensor is responding in real time), a
+   button-driven "Done spinning" instead of a race against a timer, no
+   fixed direction to get "wrong" under pressure (confirmed after the fact
+   with two buttons instead), and an explicit distinct message if
+   rotationRate genuinely never arrives at all. */
 async function flatCheck(){
   if(!sensor.on){toast("Enable sensors first");return;}
   const st=$("flatState");
+  $("btnFlatCheck").disabled=true;
   st.innerHTML="Hold the phone <b>flat and still</b>…";
   await new Promise(r=>setTimeout(r,1500));
   const s1=await sample(900);
   if(s1.g[2]>0.5){ // normalized ĝ points UP → current sign assumption is wrong
     S.accelSign=((S.accelSign===0)?-1:S.accelSign)*-1;store.set("accelSign",S.accelSign);
   }else if(S.accelSign===0){S.accelSign=-1;store.set("accelSign",-1);}
-  st.innerHTML="Tilt sign learned ✓ — now spin the phone a <b>quarter turn counter-clockwise</b> (keep it flat) within 5 s…";
+
+  if(!sensor.hasRot){
+    st.innerHTML="Tilt sign learned ✓ — but this phone/browser isn’t sending rotation data at all, so the turn-direction step can’t run. <b>Camber will still work fully.</b> Caster and gyro-toe need rotation data and won’t be available — use tape toe instead. If this is unexpected on your phone, tell Claude.";
+    $("btnFlatCheck").disabled=false;flash();beep(700,0.15);refreshDiag();return;
+  }
+
+  st.innerHTML="Tilt sign learned ✓ — now, keeping the phone <b>flat on the table</b>, turn it <b>at least a quarter turn</b>, either direction. Watch the number below climb, then tap <b>Done spinning</b>.";
   beep(990);
-  let acc=0,t0=performance.now(),last=t0;
-  await new Promise(res=>{const iv=setInterval(()=>{const now=performance.now();acc+=sensor._rot[2]*(now-last)/1000;last=now;if(now-t0>5000){clearInterval(iv);res();}},16);});
-  if(Math.abs(acc)<15){st.innerHTML="Didn’t see a clear spin — tap the button and try again (spin about 90°).";beep(300,0.2);return;}
-  // flat screen-up: earth-up = phone +z; CCW-from-above = +ωz (right-hand rule).
-  // integrator: ψ̇=−ω·ĝ·gs with ĝ=(0,0,−1) → ψ̇=+ωz·gs. CCW must read + → gs=sign(acc).
-  S.gyroSign=acc>0?1:-1;store.set("gyroSign",S.gyroSign);
+  $("flatSpinReadout").style.display="block";$("flatSpinReadout").textContent="0°";
+  $("btnFlatDone").style.display="block";$("btnFlatDone").disabled=false;
+
+  const result=await new Promise(resolve=>{
+    let acc=0,last=performance.now(),t0=last,settled=false,raf=null;
+    const cleanup=()=>{if(raf)cancelAnimationFrame(raf);$("btnFlatDone").onclick=null;};
+    const tick=()=>{
+      const now=performance.now();
+      acc+=sensor._rot[2]*(now-last)/1000;last=now;
+      $("flatSpinReadout").textContent=Math.round(Math.abs(acc))+"°";
+      if(settled)return;
+      if(now-t0>18000){settled=true;cleanup();resolve(acc);return;}
+      raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
+    $("btnFlatDone").onclick=()=>{if(settled)return;settled=true;cleanup();resolve(acc);};
+  });
+
+  $("flatSpinReadout").style.display="none";$("btnFlatDone").style.display="none";
+  $("btnFlatCheck").disabled=false;
+
+  if(Math.abs(result)<12){
+    st.innerHTML=(Math.abs(result)<1
+      ?"Sensed <b>0°</b> of rotation the whole time — rotation data isn’t reaching this page. Camber will still work; caster/gyro-toe won’t."
+      :"Only sensed "+Math.round(Math.abs(result))+"° — tap <b>Start flat check</b> and try a bigger, smoother turn, watching the number as you go.");
+    beep(300,0.2);return;
+  }
+  st.innerHTML="Rotation sensed ("+Math.round(Math.abs(result))+"°) ✓ — which way did you just turn it, looking straight down at the screen?";
+  $("flatDirRow").style.display="flex";
+  const dir=await new Promise(resolve=>{
+    $("btnFlatCCW").onclick=()=>resolve(1);
+    $("btnFlatCW").onclick=()=>resolve(-1);
+  });
+  $("flatDirRow").style.display="none";
+  // gs chosen so ψ (app's internal heading) increases for a real CCW turn:
+  // ψ = gs·(raw accumulated αz); CCW turn ⇒ want gs·result > 0 ⇒ gs = dir·sign(result).
+  S.gyroSign=dir*(result>=0?1:-1);store.set("gyroSign",S.gyroSign);
   st.innerHTML="<b>Flat check complete ✓</b> tilt sign and turn sign stored.";
   flash();beep(1320,0.12);refreshDiag();
 }
