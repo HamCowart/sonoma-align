@@ -228,7 +228,9 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <button class="btn" id="btnFlipAccel">Flip tilt sign</button>
         <button class="btn" id="btnFlipGyro">Flip turn sign</button>
       </div>
-      <p style="margin-top:6px">Only use the flip buttons if a guided check tells you a reading moves the wrong way.</p></div></details>
+      <p style="margin-top:6px">Only use the flip buttons if a guided check tells you a reading moves the wrong way.</p>
+      <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnResetCal">Reset turn calibration</button></div>
+      <p style="margin-top:6px">If flat check ever hangs or acts strangely, tap this once to clear the learned turn scale/sign, then run flat check again from a clean slate.</p></div></details>
     </div>
 
     <div class="card">
@@ -327,7 +329,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
-      <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout confirms you’re holding it truly vertical, not twisted sideways.</p>
+      <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
       <div class="wheels" style="margin-top:10px">
         <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Capture LF</button></div>
         <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Capture RF</button></div>
@@ -973,7 +975,15 @@ async function flatCheck(){
   }
 
   st.innerHTML="Tilt sign learned ✓ — one more moment, getting a clean reading…";
-  await waitSteady(600);
+  // Deliberately NOT gated on isSteady()/waitSteady() here: rotOk (inside
+  // isSteady's stillness check) is scaled by S.gyroScale, which is exactly
+  // what this flow is (re)calibrating. On a second run, with a real
+  // already-large learned scale already stored, ordinary hand tremor gets
+  // amplified past the "still" threshold and isSteady() never returns true
+  // — an infinite hang, confirmed 2026-09-11 on a real device. The prior
+  // ~2.4s hold (accel-sign step, just before this) is already enough of a
+  // settle; a short fixed pause is all this needs.
+  await new Promise(r=>setTimeout(r,600));
   const biasSample=await sample(700);
   const bias=biasSample.rot;
 
@@ -1549,6 +1559,7 @@ $("btnEnable").addEventListener("click",enableSensors);
 $("btnFlatCheck").addEventListener("click",flatCheck);
 $("btnFlipAccel").addEventListener("click",()=>{S.accelSign=(S.accelSign||-1)*-1;store.set("accelSign",S.accelSign);toast("Tilt sign flipped");refreshDiag();});
 $("btnFlipGyro").addEventListener("click",()=>{S.gyroSign=(S.gyroSign||1)*-1;store.set("gyroSign",S.gyroSign);toast("Turn sign flipped");refreshDiag();});
+$("btnResetCal").addEventListener("click",()=>{S.gyroSign=0;store.set("gyroSign",0);S.gyroScale=1;store.set("gyroScale",1);toast("Turn calibration cleared — run flat check again");refreshDiag();});
 $("btnZeroGo").addEventListener("click",zeroRun);
 $("btnZeroReset").addEventListener("click",()=>{S.zero=null;store.set("zero",null);zeroFlow.step=0;zeroUI();$("zeroState").textContent="No gauge zero stored.";setChip("chipZero",false);});
 $("btnFloorGo").addEventListener("click",()=>floorRun("front"));
