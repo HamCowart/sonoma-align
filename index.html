@@ -598,8 +598,13 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
    Constant offsets (gauge zero, floor lean) cancel in the difference.
    Even part gives SAI (diagnostic): σ ≈ −(cL+cR−2c0)/((1−cosθL)+(1−cosθR)).
    Steer angle = yaw about earth-vertical integrated from rotationRate:
-     ψ̇ = −(ω⃗·ĝ)·gs   (+ = counter-clockwise from above = steering left),
-   gyro bias sampled during the still start, sign gs from the flat check.
+     ψ̇ = −(ω⃗·ĝ)·gs·sc   (+ = counter-clockwise from above = steering left),
+   gyro bias sampled during the still start; sign gs and scale sc both come
+   from the flat check (sc corrects a real per-device rotationRate scale
+   error, learned by comparing the raw gyro integral against iOS's
+   webkitCompassHeading over the same spin — see flatCheck()'s own header
+   for the full derivation. sc defaults to 1 when compass calibration isn't
+   available, i.e. no worse than before it existed).
 
    TOE — gyro carry. Bar horizontal, phone top toward the bumper on all
    wheels ⇒ every station shares one heading convention. ψ tracked
@@ -632,6 +637,28 @@ const store={
 /* ---------- pure math (exposed for tests) ---------- */
 function zeroFrom(r1,r2,r3){const f=(r1-r2)/2,p=(r1+r3)/2;return{f,p,off:f+p,c:r1-f-p};}
 function floorFrom(sA,sB){return{slope:(sA-sB)/2,bias:(sA+sB)/2};}
+// signed shortest-path delta from a to b, in (-180,180]
+function headingStepDeltaPure(a,b){return((b-a+540)%360)-180;}
+/* Compass-referenced gyro calibration. calRaw = the SAME bias-corrected wz
+   integral the runtime uses (∫(rot-bias)·ĝ dt), UNSCALED, no gs applied yet.
+   compassDelta = continuously-unwrapped compass heading change over the same
+   interval (+ = turned clockwise, from webkitCompassHeading's convention).
+   Runtime computes Δyaw = -gs*scale*calRaw and must equal psi_true=-compassDelta,
+   so gs*scale*calRaw = compassDelta ⇒ gs=sign(compassDelta)*sign(calRaw),
+   scale=|compassDelta|/|calRaw|. (Verified 2026-09-10 against three independent
+   adversarial re-derivations after an earlier draft had this sign backwards —
+   the runtime formula's own leading minus must not be dropped when solving.)
+   Gated: requires real rotation on both sides and a scale in a broad sane
+   band (covers both "no bug, scale≈1" and "≈57x radians/degrees bug" cases,
+   and everything else is more likely noise than a genuine third scale). */
+function gyroCalFrom(calRaw,compassDelta,opts={}){
+  const minRaw=opts.minRaw??0.05, minCompass=opts.minCompass??20;
+  if(Math.abs(calRaw)<minRaw||Math.abs(compassDelta)<minCompass)return{valid:false,reason:"insufficient rotation"};
+  const scale=Math.abs(compassDelta)/Math.abs(calRaw);
+  if(!(scale>=0.15&&scale<=400))return{valid:false,reason:"scale out of plausible range",scale};
+  const gs=Math.sign(compassDelta)*Math.sign(calRaw);
+  return{valid:true,gs,scale};
+}
 function casterFrom(thL,cL,thR,cR,c0){
   const den=Math.sin(R(thL))-Math.sin(R(thR));
   if(Math.abs(den)<0.15)return null;
@@ -656,7 +683,7 @@ function toeReduce(stations){
   }
   return out;
 }
-window.__align={zeroFrom,floorFrom,casterFrom,toeReduce};
+window.__align={zeroFrom,floorFrom,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES={
@@ -703,6 +730,7 @@ const S={
   veh:store.get("veh","sonoma"),
   accelSign:store.get("accelSign",0),   // +1 spec/Android, −1 iOS-style, 0 unknown (assume iOS)
   gyroSign:store.get("gyroSign",0),
+  gyroScale:store.get("gyroScale",1),   // corrects a real-device rotationRate scale error; learned via compass when available
   camSign:store.get("camSign",{LF:1,RF:1,LR:1,RR:1}),
   specs:store.get("specs",{}),          // per-vehicle overrides
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when}, rear:{...}}
@@ -724,8 +752,21 @@ const sensor={
   g:[0,0,-1],gRaw:[0,0,-9.8],
   noise:1,stillSince:0,
   yaw:0,yawRun:false,gyroBias:[0,0,0],
-  _buf:[],_rot:[0,0,0]
+  _buf:[],_rot:[0,0,0],
+  hasCompass:false,compassHeading:null,compassAccuracy:null,compassEvt:0
 };
+function onOrient(e){
+  if(e.webkitCompassHeading!=null&&!isNaN(e.webkitCompassHeading)){
+    sensor.hasCompass=true;sensor.compassHeading=e.webkitCompassHeading;
+    sensor.compassAccuracy=(e.webkitCompassAccuracy!=null&&!isNaN(e.webkitCompassAccuracy))?e.webkitCompassAccuracy:null;
+    sensor.compassEvt++;
+  }else if(e.absolute===true&&e.alpha!=null){
+    sensor.hasCompass=true;sensor.compassHeading=(360-e.alpha)%360; // non-iOS absolute-orientation fallback
+    sensor.compassAccuracy=null;sensor.compassEvt++;
+  }
+}
+// signed shortest-path delta from a to b, in (-180,180] — safe only for steps well under 180°
+function headingStepDelta(a,b){return((b-a+540)%360)-180;}
 function normAccel(ax,ay,az){
   const s=(S.accelSign===0)?-1:S.accelSign;
   const f=(s===1)?-1:1;   // spec devices report reaction (up) → gravity = −a
@@ -763,14 +804,20 @@ function onMotion(e){
     sensor._rot=[r.beta||0,r.gamma||0,r.alpha||0]; // about x, y, z — deg/s per spec
     if(sensor.yawRun){
       const dt=sensor.lastEvt?Math.min((now-sensor.lastEvt)/1000,0.1):0.016;
-      const w=sensor._rot,b=sensor.gyroBias,gs=(S.gyroSign||1);
+      const w=sensor._rot,b=sensor.gyroBias,gs=(S.gyroSign||1),sc=(S.gyroScale||1);
       const wz=((w[0]-b[0])*sensor.g[0]+(w[1]-b[1])*sensor.g[1]+(w[2]-b[2])*sensor.g[2]);
-      sensor.yaw+=(-wz*gs)*dt;
+      sensor.yaw+=(-wz*gs*sc)*dt;
     }
   }
   sensor.lastEvt=now;sensor.on=true;
 }
-function curRotMag(){const r=sensor._rot;return Math.hypot(r[0],r[1],r[2]);}
+// Scaled by gyroScale so the thresholds at both call sites (tuned assuming
+// roughly-correct raw units) stay meaningful on a device where the raw
+// rotation rate itself is under/over-counted — otherwise a real slow turn
+// can misread as "basically stationary" on a device with the scale bug,
+// confirmed 2026-09-10 to cause sloppy caster auto-capture (overshoot past
+// the ±15° target before the steadiness gate ever disqualifies it).
+function curRotMag(){const r=sensor._rot;return Math.hypot(r[0],r[1],r[2])*(S.gyroScale||1);}
 function isSteady(holdMs=500){return sensor.stillSince&&(performance.now()-sensor.stillSince>holdMs);}
 function sample(ms=1100){
   return new Promise(res=>{
@@ -796,7 +843,15 @@ async function enableSensors(){
       const p=await DeviceMotionEvent.requestPermission();
       if(p!=="granted"){$("sensorState").textContent="Permission denied — allow Motion & Orientation access and tap again.";return;}
     }
+    // Same underlying iOS permission grant covers this too — request it so the
+    // flat check can use the compass for a self-calibrating gyro scale/sign.
+    // Never blocking: if this rejects or isn't supported, compass calibration
+    // just won't be offered and the manual sign-only flow still works.
+    if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){
+      try{await DeviceOrientationEvent.requestPermission();}catch(e){}
+    }
     window.addEventListener("devicemotion",onMotion);
+    window.addEventListener("deviceorientation",onOrient);
     $("sensorState").textContent="Listening… move the phone to confirm.";
     setTimeout(()=>{
       if(!sensor.on){$("sensorBlocked").style.display="block";$("sensorState").textContent="No sensor data arrived.";setChip("chipSens",false);}
@@ -814,21 +869,51 @@ function refreshDiag(){
     "rotationRate   : "+(sensor.hasRot?"yes":"no")+"\n"+
     "accel sign     : "+(S.accelSign===0?"assumed iOS":S.accelSign===1?"spec/Android":"iOS")+"\n"+
     "turn sign      : "+(S.gyroSign===0?"not learned":S.gyroSign)+"\n"+
+    "turn scale     : "+S.gyroScale.toFixed(2)+"x"+(S.gyroScale>5?"  (device is undercounting rotation — this corrects it)":"")+"\n"+
+    "compass        : "+(sensor.hasCompass?"available ("+(sensor.compassHeading!=null?sensor.compassHeading.toFixed(0)+"°":"–")+(sensor.compassAccuracy!=null?", ±"+sensor.compassAccuracy.toFixed(0)+"°":"")+")":"not available")+"\n"+
     "gravity dir    : ["+sensor.g.map(v=>v.toFixed(2)).join(", ")+"]\n"+
     "tilt noise     : "+sensor.noise.toFixed(3)+"°";
 }
 setInterval(refreshDiag,900);
 
 /* ---------- flat check ----------
-   Rewritten after a real-device report ("doesn't recognize when I turn the
-   phone") — the old version was a blind 5s timer with zero feedback, so a
-   user had no way to tell a slow/late turn from a genuinely dead sensor,
-   and no reaction time before the window started. Now: live readout of
-   sensed rotation (proves the sensor is responding in real time), a
-   button-driven "Done spinning" instead of a race against a timer, no
-   fixed direction to get "wrong" under pressure (confirmed after the fact
-   with two buttons instead), and an explicit distinct message if
-   rotationRate genuinely never arrives at all. */
+   v3, 2026-09-10. A real-device report ("if i spin the phone multiple times
+   it may read a degree or two each turn") pointed at something bigger than
+   the v2 UX fix: a systematic ~50-60x undercount in rotationRate integration
+   on the user's device — consistent with Apple's native CMGyroData reporting
+   radians/second while the web DeviceMotionEvent spec calls for degrees/second
+   (confirmed as a real, documented unit split between those two API layers;
+   not confirmed as THE specific live bug, since no external report of WebKit
+   dropping that conversion was found — see project notes). Rather than bake
+   in an assumed 57.3x fix (fragile — right only if that exact cause is right,
+   wrong on any device where it isn't), this version measures the real scale
+   empirically: iOS Safari's webkitCompassHeading gives an independent,
+   already-tilt-compensated heading in true degrees during the same spin the
+   user already does, so the true rotation and the gyro's raw integral can be
+   compared directly and the exact correction factor solved for, whatever it
+   turns out to be (1x if there's no bug, ~57x if the radians theory is right,
+   or anything else).
+
+   Falls back to the v2 manual two-button sign-only flow when compass data
+   isn't available/clean enough — never worse than before, only better when
+   the compass path works.
+
+   SIGN DERIVATION — got this wrong once already; do not re-break it.
+   An earlier draft of this fix derived gs=-sign(deltaCompass)*sign(calRaw)
+   and was independently caught by three adversarial reviews: it silently
+   dropped the leading minus that already exists in the runtime line
+   `sensor.yaw += (-wz*gs*sc)*dt`. Re-derived correctly, tracking that minus:
+     Δyaw_runtime = -gs·sc·calRaw   (calRaw = the SAME bias-corrected wz
+                                      integral runtime uses, unscaled)
+     want Δyaw_runtime = ψ_true = -Δcompass  (app: +ψ=CCW; compass: +=CW)
+     ⇒ -gs·sc·calRaw = -Δcompass  ⇒  gs·sc·calRaw = Δcompass
+     ⇒ gs = sign(Δcompass)·sign(calRaw),  sc = |Δcompass| / |calRaw|
+   (scale is sign-invariant so it was right either way — only gs flips.)
+   Manual fallback (no independent Δcompass, only a self-reported direction
+   "dir": +1=turned left/CCW, -1=right/CW, i.e. dir=sign(ψ_true)=sign(-Δcompass)):
+     want sign(Δyaw_runtime)=dir ⇒ sign(-gs·calRaw)=dir ⇒ gs=-dir·sign(calRaw)
+   Cross-checked: substituting Δcompass=-dir into the compass formula gives
+   the same -dir·sign(calRaw). Both paths verified to agree before shipping. */
 async function flatCheck(){
   if(!sensor.on){toast("Enable sensors first");return;}
   const st=$("flatState");
@@ -845,46 +930,72 @@ async function flatCheck(){
     $("btnFlatCheck").disabled=false;flash();beep(700,0.15);refreshDiag();return;
   }
 
-  st.innerHTML="Tilt sign learned ✓ — now, keeping the phone <b>flat on the table</b>, turn it <b>at least a quarter turn</b>, either direction. Watch the number below climb, then tap <b>Done spinning</b>.";
+  st.innerHTML="Tilt sign learned ✓ — one more moment, getting a clean reading…";
+  await waitSteady(600);
+  const biasSample=await sample(700);
+  const bias=biasSample.rot;
+
+  st.innerHTML="Ready — keeping the phone <b>flat on the table</b>, turn it <b>at least a full turn</b>, either direction (more than one full spin is fine). Watch the number below climb, then tap <b>Done spinning</b>.";
   beep(990);
   $("flatSpinReadout").style.display="block";$("flatSpinReadout").textContent="0°";
   $("btnFlatDone").style.display="block";$("btnFlatDone").disabled=false;
 
-  const result=await new Promise(resolve=>{
-    let acc=0,last=performance.now(),t0=last,settled=false,raf=null;
+  const spin=await new Promise(resolve=>{
+    let calRaw=0,compassDelta=0,lastHeading=null,compassN=0,accSum=0,accN=0;
+    let last=performance.now(),t0=last,settled=false,raf=null;
     const cleanup=()=>{if(raf)cancelAnimationFrame(raf);$("btnFlatDone").onclick=null;};
+    const finish=()=>resolve({calRaw,compassDelta,compassN,accAvg:accN?accSum/accN:null});
     const tick=()=>{
-      const now=performance.now();
-      acc+=sensor._rot[2]*(now-last)/1000;last=now;
-      $("flatSpinReadout").textContent=Math.round(Math.abs(acc))+"°";
+      const now=performance.now(),dt=(now-last)/1000;last=now;
+      const w=sensor._rot;
+      const wz=(w[0]-bias[0])*sensor.g[0]+(w[1]-bias[1])*sensor.g[1]+(w[2]-bias[2])*sensor.g[2];
+      calRaw+=wz*dt;
+      if(sensor.hasCompass&&sensor.compassHeading!=null){
+        if(lastHeading!=null)compassDelta+=headingStepDelta(lastHeading,sensor.compassHeading);
+        lastHeading=sensor.compassHeading;
+        if(sensor.compassAccuracy!=null){accSum+=sensor.compassAccuracy;accN++;}
+        compassN++;
+      }
+      const showCompass=compassN>=3;
+      $("flatSpinReadout").textContent=Math.round(Math.abs(showCompass?compassDelta:calRaw))+(showCompass?"°":" raw");
       if(settled)return;
-      if(now-t0>18000){settled=true;cleanup();resolve(acc);return;}
+      if(now-t0>20000){settled=true;cleanup();finish();return;}
       raf=requestAnimationFrame(tick);
     };
     raf=requestAnimationFrame(tick);
-    $("btnFlatDone").onclick=()=>{if(settled)return;settled=true;cleanup();resolve(acc);};
+    $("btnFlatDone").onclick=()=>{if(settled)return;settled=true;cleanup();finish();};
   });
 
   $("flatSpinReadout").style.display="none";$("btnFlatDone").style.display="none";
   $("btnFlatCheck").disabled=false;
 
-  if(Math.abs(result)<12){
-    st.innerHTML=(Math.abs(result)<1
-      ?"Sensed <b>0°</b> of rotation the whole time — rotation data isn’t reaching this page. Camber will still work; caster/gyro-toe won’t."
-      :"Only sensed "+Math.round(Math.abs(result))+"° — tap <b>Start flat check</b> and try a bigger, smoother turn, watching the number as you go.");
+  if(spin.compassN>=4&&(spin.accAvg==null||spin.accAvg<=15)){
+    const cal=gyroCalFrom(spin.calRaw,spin.compassDelta);
+    if(cal.valid){
+      S.gyroSign=cal.gs;store.set("gyroSign",cal.gs);
+      S.gyroScale=cal.scale;store.set("gyroScale",cal.scale);
+      st.innerHTML="<b>Flat check complete ✓</b> auto-calibrated against your phone’s compass — "+
+        (cal.scale>5?("found your phone was undercounting rotation by about "+Math.round(cal.scale)+"×; that’s now corrected."):"turn scale confirmed correct.")+
+        " Caster and toe should track accurately now.";
+      flash();beep(1320,0.12);refreshDiag();return;
+    }
+  }
+
+  // Manual fallback — sign only; leaves any previously learned S.gyroScale untouched.
+  if(Math.abs(spin.calRaw)<0.05){
+    st.innerHTML="Sensed no usable rotation — rotation data isn’t reaching this page. Camber will still work; caster/gyro-toe won’t.";
     beep(300,0.2);return;
   }
-  st.innerHTML="Rotation sensed ("+Math.round(Math.abs(result))+"°) ✓ — which way did you just turn it, looking straight down at the screen?";
+  st.innerHTML="Rotation sensed ✓ — which way did you just turn it, looking straight down at the screen?"+
+    (sensor.hasCompass?" (Compass wasn’t clean enough to auto-calibrate scale this time — sign only.)":"");
   $("flatDirRow").style.display="flex";
   const dir=await new Promise(resolve=>{
     $("btnFlatCCW").onclick=()=>resolve(1);
     $("btnFlatCW").onclick=()=>resolve(-1);
   });
   $("flatDirRow").style.display="none";
-  // gs chosen so ψ (app's internal heading) increases for a real CCW turn:
-  // ψ = gs·(raw accumulated αz); CCW turn ⇒ want gs·result > 0 ⇒ gs = dir·sign(result).
-  S.gyroSign=dir*(result>=0?1:-1);store.set("gyroSign",S.gyroSign);
-  st.innerHTML="<b>Flat check complete ✓</b> tilt sign and turn sign stored.";
+  S.gyroSign=-dir*(spin.calRaw>=0?1:-1);store.set("gyroSign",S.gyroSign);
+  st.innerHTML="<b>Flat check complete ✓</b> turn direction stored"+(S.gyroScale!==1?" (still using a previously learned scale, "+S.gyroScale.toFixed(1)+"×)":"")+".";
   flash();beep(1320,0.12);refreshDiag();
 }
 
@@ -1393,6 +1504,7 @@ camUI();casUI();toeRender();renderResults();
 tick();
 if(typeof DeviceMotionEvent!=="undefined"&&typeof DeviceMotionEvent.requestPermission!=="function"){
   window.addEventListener("devicemotion",onMotion);
+  window.addEventListener("deviceorientation",onOrient);
   setTimeout(()=>{if(sensor.on){$("sensorState").innerHTML="<b>Sensors live</b> (no permission needed on this device).";setChip("chipSens",true);}},1500);
 }
 </script>
