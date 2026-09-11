@@ -91,6 +91,12 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--card);bor
 .steady{display:inline-flex;align-items:center;gap:5px}
 .steady i{width:9px;height:9px;border-radius:50%;background:var(--face-line);display:inline-block}
 .steady.on i{background:#59d98c;box-shadow:0 0 8px #59d98c}
+.orient{display:flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:12px;margin-top:7px;color:var(--face-mut)}
+.orient i{width:8px;height:8px;border-radius:50%;background:var(--face-line);flex:none;display:inline-block}
+.orient.good i{background:#59d98c;box-shadow:0 0 6px #59d98c}
+.orient.warn i{background:#e8b84b;box-shadow:0 0 6px #e8b84b}
+.orient.bad i{background:#e4606a;box-shadow:0 0 6px #e4606a}
+.orient b{color:var(--face-mut);font-weight:600}
 .bubblewrap{margin:8px 0 2px}
 .bubble{width:100%;height:44px;display:block}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -316,11 +322,12 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="readout dead" id="roCam">––.––<span class="u">°</span></div>
       <div class="bubblewrap"><svg class="bubble" id="bubCam"></svg></div>
       <div class="row2"><span id="roCamRaw">raw –</span><span id="roCamFloor">floor corr –</span></div>
+      <div class="orient" id="orientCam"><i></i><span id="orientCamTxt">plumb –</span></div>
     </div>
 
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
-      <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green.</p>
+      <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout confirms you’re holding it truly vertical, not twisted sideways.</p>
       <div class="wheels" style="margin-top:10px">
         <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Capture LF</button></div>
         <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Capture RF</button></div>
@@ -347,6 +354,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="readout dead" id="roCas">––.–<span class="u">°</span></div>
       <div class="bubblewrap"><svg class="bubble" id="bubCas"></svg></div>
       <div class="row2"><span id="roCasA">camber –</span><span id="roCasB">target –</span></div>
+      <div class="orient" id="orientCas"><i></i><span id="orientCasTxt">plumb –</span></div>
     </div>
 
     <div class="card">
@@ -386,11 +394,12 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="readout dead" id="roToe">––.––<span class="u">°</span></div>
       <div class="bubblewrap"><svg class="bubble" id="bubToe"></svg></div>
       <div class="row2"><span id="roToeA">–</span><span id="roToeB">–</span></div>
+      <div class="orient" id="orientToe"><i></i><span id="orientToeTxt">level –</span></div>
     </div>
 
     <div class="card">
       <div class="spread"><h2>Gyro toe</h2><span class="pill na">±0.05–0.15°</span></div>
-      <p class="hint">Bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>top of phone toward the front bumper on every wheel</b>. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins.</p>
+      <p class="hint">Bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>top of phone toward the front bumper on every wheel</b>. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn" id="btnToeModeF">Front only</button>
         <button class="btn sel" id="btnToeModeA">All 4 wheels</button>
@@ -856,6 +865,16 @@ function sample(ms=1100){
 }
 const tiltZ=g=>D(Math.asin(clamp(g[2],-1,1)));
 const tiltY=g=>D(Math.asin(clamp(g[1],-1,1)));
+// Orientation-quality readouts — a hold-consistency aid, not a strict gate:
+// both camber/caster (roll away from plumb) and toe (tilt away from flat)
+// are second-order-in-θ effects on the actual measurement (rocking the bar
+// in its own plane barely moves tiltZ; a few degrees off level only scales
+// toe's yaw integration by cos θ ≈ 1), so generous thresholds are honest —
+// this is about holding it the same way every time, not chasing precision
+// the math doesn't need.
+const rollError=g=>D(Math.asin(clamp(g[0],-1,1)));               // vertical hold: left-right twist
+const levelError=g=>D(Math.asin(clamp(Math.hypot(g[0],g[1]),0,1))); // horizontal hold: tilt off flat
+window.__align.rollError=rollError;window.__align.levelError=levelError;
 function waitSteady(preMs=800){return new Promise(r=>{const iv=setInterval(()=>{if(isSteady(preMs)){clearInterval(iv);r(true);}},100);});}
 
 /* ---------- permission / diagnostics ---------- */
@@ -1449,6 +1468,12 @@ async function keepAwake(){
 
 /* ---------- live loop ---------- */
 let activeScr="setup";
+function setOrient(elId,txtId,errDeg,label){
+  const el=$(elId);
+  const cls=Math.abs(errDeg)<3?"good":Math.abs(errDeg)<8?"warn":"bad";
+  el.classList.remove("good","warn","bad");el.classList.add(cls);
+  $(txtId).textContent=label+" "+fmt(errDeg,1)+"°"+(cls==="good"?" ✓":"");
+}
 function tick(){
   const steadyNow=isSteady(500);
   if(activeScr==="setup"&&sensor.on){
@@ -1465,9 +1490,11 @@ function tick(){
     const tgt=(camSide==="LR"||camSide==="RR")?sp.rcam:sp.cam, tol=(camSide==="LR"||camSide==="RR")?sp.rcamT:sp.camT;
     drawBubble($("bubCam"),v,{span:Math.max(2.5,Math.abs(tgt)+tol+1),target:tgt,tol:tol});
     $("stCam").classList.toggle("on",!!steadyNow);
+    setOrient("orientCam","orientCamTxt",rollError(sensor.g),"plumb");
   }
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
+    setOrient("orientCas","orientCasTxt",rollError(sensor.g),"plumb");
     if(cas.run&&cas.phase>=2){
       const psi=sensor.yaw;
       $("roCas").classList.remove("dead");
@@ -1491,6 +1518,7 @@ function tick(){
   }
   if(activeScr==="toe"&&sensor.on){
     $("stToe").classList.toggle("on",!!steadyNow);
+    setOrient("orientToe","orientToeTxt",levelError(sensor.g),"level");
     if(toe.run&&toe.idx>=1){
       $("roToe").classList.remove("dead");
       $("roToe").innerHTML=fmt(sensor.yaw)+'<span class="u">°</span>';
@@ -1501,7 +1529,7 @@ function tick(){
       $("roToe").classList.toggle("dead",!toe.run);
       $("roToe").innerHTML=(toe.run?fmt(0):"––.––")+'<span class="u">°</span>';
       $("roToeA").textContent=toe.run?"capture RF to start tracking":"idle";
-      $("roToeB").textContent="bar level "+fmt(tiltY(sensor.g),1)+"°";
+      $("roToeB").textContent="";
       drawBubble($("bubToe"),toe.run?0:null,{span:8});
     }
   }
