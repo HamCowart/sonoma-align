@@ -247,6 +247,24 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     </div>
 
     <div class="card">
+      <h2>2b · Zero against a level <span class="small" style="text-transform:none;letter-spacing:0">(optional, once per phone)</span></h2>
+      <p class="hint">The gauge-zero step below cancels bar and mounting error for camber, but nothing else corrects a phone that simply reads a couple of degrees off <b>even by itself</b> — for example the <b>plumb</b>/<b>level</b> dots on Camber, Caster, and Toe. If you have a trusted digital level, use it here once to zero that out for good.</p>
+      <div class="steps" style="margin-top:10px">
+        <div class="step"><div class="stepn">1</div><div class="stept">Hold the bare phone <b>upright</b> (portrait, like on the wheel) flush against your digital level, both reading the same true-vertical surface. Confirm the level itself reads <b>0.0°</b>, hold still, tap <b>Zero plumb</b>.</div></div>
+        <div class="step"><div class="stepn">2</div><div class="stept">Lay the phone <b>flat</b> against the level on a level-confirmed flat surface, hold still, tap <b>Zero level</b>.</div></div>
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn primary" id="btnZeroRoll">Zero plumb</button>
+        <button class="btn primary" id="btnZeroLevel">Zero level</button>
+      </div>
+      <div class="btnrow" style="margin-top:8px">
+        <button class="btn ghost" id="btnResetRoll">Reset plumb</button>
+        <button class="btn ghost" id="btnResetLevel">Reset level</button>
+      </div>
+      <div class="hint" id="levelZeroState" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
       <h2>3 · Zero the gauge</h2>
       <p class="hint">Cancels the small built-in lean of your phone and the gauge bar. Do this <b>once each time you mount the phone</b> in the bar. Hold the bar on any wheel, upright (feet at 12 and 6 o’clock), and follow the three captures.</p>
       <div class="steps" style="margin-top:10px" id="zeroSteps">
@@ -766,6 +784,8 @@ const S={
   gyroSign:store.get("gyroSign",0),
   gyroScale:store.get("gyroScale",1),   // corrects a real-device rotationRate scale error; learned via compass when available
   camSign:store.get("camSign",{LF:1,RF:1,LR:1,RR:1}),
+  rollZero:store.get("rollZero",0),     // plumb-axis offset, zeroed against a trusted external level
+  levelZero:store.get("levelZero",0),   // level-axis offset, same idea for the horizontal hold
   specs:store.get("specs",{}),          // per-vehicle overrides
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when}, rear:{...}}
   zero:store.get("zero",null),
@@ -897,6 +917,15 @@ const tiltY=g=>D(Math.asin(clamp(g[1],-1,1)));
 const rollError=g=>D(Math.asin(clamp(g[0],-1,1)));               // vertical hold: left-right twist
 const levelError=g=>D(Math.asin(clamp(Math.hypot(g[0],g[1]),0,1))); // horizontal hold: tilt off flat
 window.__align.rollError=rollError;window.__align.levelError=levelError;
+// Displayed versions, corrected against whatever was captured during a
+// "zero against a trusted level" calibration (Setup). The gauge-zero flip
+// technique already cancels bar/phone bias on the camber (tiltZ) axis —
+// it never touched this roll axis at all, so a phone with any built-in
+// accelerometer bias here would read a false few degrees even when
+// genuinely plumb, with no way to correct it. This closes that gap.
+const liveRollError=g=>rollError(g)-(S.rollZero||0);
+const liveLevelError=g=>levelError(g)-(S.levelZero||0);
+window.__align.liveRollError=liveRollError;window.__align.liveLevelError=liveLevelError;
 function waitSteady(preMs=800){return new Promise(r=>{const iv=setInterval(()=>{if(isSteady(preMs)){clearInterval(iv);r(true);}},100);});}
 
 /* ---------- permission / diagnostics ---------- */
@@ -935,6 +964,8 @@ function refreshDiag(){
     "turn sign      : "+(S.gyroSign===0?"not learned":S.gyroSign)+"\n"+
     "turn scale     : "+S.gyroScale.toFixed(2)+"x"+(S.gyroScale>5?"  (device is undercounting rotation — this corrects it)":"")+"\n"+
     "compass        : "+(sensor.hasCompass?"available ("+(sensor.compassHeading!=null?sensor.compassHeading.toFixed(0)+"°":"–")+(sensor.compassAccuracy!=null?", ±"+sensor.compassAccuracy.toFixed(0)+"°":"")+")":"not available")+"\n"+
+    "plumb zero     : "+fmt(S.rollZero)+"°\n"+
+    "level zero     : "+fmt(S.levelZero)+"°\n"+
     "gravity dir    : ["+sensor.g.map(v=>v.toFixed(2)).join(", ")+"]\n"+
     "tilt noise     : "+sensor.noise.toFixed(3)+"°";
 }
@@ -1082,6 +1113,29 @@ function drawBubble(svg,val,opt={}){
   if(val!=null&&!isNaN(val)){const inT=(target!=null&&tol!=null&&Math.abs(val-target)<=tol);
     s+=`<g transform="translate(${x(val)},${h/2})"><circle r="8.5" fill="${inT?'#59d98c':'var(--digit)'}" opacity=".92"/><circle r="8.5" fill="none" stroke="rgba(0,0,0,.35)"/></g>`;}
   svg.setAttribute("viewBox",`0 0 ${w} ${h}`);svg.innerHTML=s;
+}
+
+/* ---------- level-referenced roll/level zero ---------- */
+async function zeroAgainstLevel(kind){
+  if(!sensor.on){toast("Enable sensors first");return;}
+  const st=$("levelZeroState");
+  st.textContent="Hold still against the level…";
+  const ok=await Promise.race([waitSteady(600).then(()=>true),new Promise(r=>setTimeout(()=>r(false),6000))]);
+  if(!ok){st.textContent="Too much movement — brace it against the level and try again.";toast("Hold still and try again");return;}
+  const s=await sample(1200);
+  if(kind==="roll"){
+    S.rollZero=rollError(s.g);store.set("rollZero",S.rollZero);
+    st.innerHTML="<b>Plumb zeroed ✓</b> was reading "+fmt(S.rollZero)+"° at true vertical — now corrected.";
+  }else{
+    S.levelZero=levelError(s.g);store.set("levelZero",S.levelZero);
+    st.innerHTML="<b>Level zeroed ✓</b> was reading "+fmt(S.levelZero)+"° at true flat — now corrected.";
+  }
+  flash();beep(1320,0.12);
+}
+function resetLevelZero(kind){
+  if(kind==="roll"){S.rollZero=0;store.set("rollZero",0);}else{S.levelZero=0;store.set("levelZero",0);}
+  $("levelZeroState").textContent=(kind==="roll"?"Plumb":"Level")+" zero reset to 0°.";
+  toast((kind==="roll"?"Plumb":"Level")+" zero reset");
 }
 
 /* ---------- gauge zero flow ---------- */
@@ -1520,11 +1574,11 @@ function tick(){
     const tgt=(camSide==="LR"||camSide==="RR")?sp.rcam:sp.cam, tol=(camSide==="LR"||camSide==="RR")?sp.rcamT:sp.camT;
     drawBubble($("bubCam"),v,{span:Math.max(2.5,Math.abs(tgt)+tol+1),target:tgt,tol:tol});
     $("stCam").classList.toggle("on",!!steadyNow);
-    setOrient("orientCam","orientCamTxt",rollError(sensor.g),"plumb");
+    setOrient("orientCam","orientCamTxt",liveRollError(sensor.g),"plumb");
   }
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
-    setOrient("orientCas","orientCasTxt",rollError(sensor.g),"plumb");
+    setOrient("orientCas","orientCasTxt",liveRollError(sensor.g),"plumb");
     if(cas.run&&cas.phase>=2){
       const psi=sensor.yaw;
       $("roCas").classList.remove("dead");
@@ -1548,7 +1602,7 @@ function tick(){
   }
   if(activeScr==="toe"&&sensor.on){
     $("stToe").classList.toggle("on",!!steadyNow);
-    setOrient("orientToe","orientToeTxt",levelError(sensor.g),"level");
+    setOrient("orientToe","orientToeTxt",liveLevelError(sensor.g),"level");
     if(toe.run&&toe.idx>=1){
       $("roToe").classList.remove("dead");
       $("roToe").innerHTML=fmt(sensor.yaw)+'<span class="u">°</span>';
@@ -1580,6 +1634,10 @@ $("btnFlatCheck").addEventListener("click",flatCheck);
 $("btnFlipAccel").addEventListener("click",()=>{S.accelSign=(S.accelSign||-1)*-1;store.set("accelSign",S.accelSign);toast("Tilt sign flipped");refreshDiag();});
 $("btnFlipGyro").addEventListener("click",()=>{S.gyroSign=(S.gyroSign||1)*-1;store.set("gyroSign",S.gyroSign);toast("Turn sign flipped");refreshDiag();});
 $("btnResetCal").addEventListener("click",()=>{S.gyroSign=0;store.set("gyroSign",0);S.gyroScale=1;store.set("gyroScale",1);toast("Turn calibration cleared — run flat check again");refreshDiag();});
+$("btnZeroRoll").addEventListener("click",()=>zeroAgainstLevel("roll"));
+$("btnZeroLevel").addEventListener("click",()=>zeroAgainstLevel("level"));
+$("btnResetRoll").addEventListener("click",()=>resetLevelZero("roll"));
+$("btnResetLevel").addEventListener("click",()=>resetLevelZero("level"));
 $("btnZeroGo").addEventListener("click",zeroRun);
 $("btnZeroReset").addEventListener("click",()=>{S.zero=null;store.set("zero",null);zeroFlow.step=0;zeroUI();$("zeroState").textContent="No gauge zero stored.";setChip("chipZero",false);});
 $("btnFloorGo").addEventListener("click",()=>floorRun("front"));
@@ -1618,6 +1676,7 @@ if(!store.get("introDone",false))$("intro").hidden=false;
 toeSetMode(toe.mode);
 if(S.zero){$("zeroState").innerHTML="Gauge zero stored ("+fmt(S.zero.off)+"°) from "+new Date(S.zero.when).toLocaleString()+". Re-do after remounting the phone.";setChip("chipZero",true);}
 if(S.accelSign!==0&&S.gyroSign!==0)$("flatState").innerHTML="Flat check done earlier ✓ (redo any time).";
+if(S.rollZero||S.levelZero)$("levelZeroState").innerHTML="Stored: plumb "+fmt(S.rollZero)+"°, level "+fmt(S.levelZero)+"°.";
 $("sessState").textContent="Session started "+new Date(S.sess.started).toLocaleString();
 camUI();casUI();toeRender();renderResults();
 tick();
