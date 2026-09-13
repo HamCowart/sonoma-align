@@ -817,18 +817,31 @@ function onMotion(e){
     const k=curRotMag()>25?0.4:0.12;   // follow faster while being carried/turned
     sensor.g=[sensor.g[0]+(u[0]-sensor.g[0])*k,sensor.g[1]+(u[1]-sensor.g[1])*k,sensor.g[2]+(u[2]-sensor.g[2])*k];
     sensor.gRaw=g;
-    const tilt=D(Math.asin(clamp(u[2],-1,1)));
-    sensor._buf.push({t:now,tilt,mag});
-    while(sensor._buf.length&&now-sensor._buf[0].t>700)sensor._buf.shift();
+    // Steadiness is judged on the SAME smoothed sensor.g the screen actually
+    // shows (was judged on raw, un-smoothed per-sample noise before —
+    // confirmed 2026-09-12 on real hardware to cause "too shaky" failures
+    // and a jittery plumb readout even while the displayed number looked
+    // calm and still, because the two were measuring different things).
+    // Tracks both axes that matter: z (camber tilt) and x (plumb/roll) —
+    // a wobble on either one means the phone isn't actually being held
+    // still, even if the OTHER axis happens to look quiet.
+    const tz=D(Math.asin(clamp(sensor.g[2],-1,1))), tx=D(Math.asin(clamp(sensor.g[0],-1,1)));
+    sensor._buf.push({t:now,tz,tx,mag});
+    while(sensor._buf.length&&now-sensor._buf[0].t>900)sensor._buf.shift();
     if(sensor._buf.length>6){
-      const m=sensor._buf.reduce((s,x)=>s+x.tilt,0)/sensor._buf.length;
-      const sd=Math.sqrt(sensor._buf.reduce((s,x)=>s+(x.tilt-m)**2,0)/sensor._buf.length);
+      const mz=sensor._buf.reduce((s,x)=>s+x.tz,0)/sensor._buf.length;
+      const mx=sensor._buf.reduce((s,x)=>s+x.tx,0)/sensor._buf.length;
+      const sdz=Math.sqrt(sensor._buf.reduce((s,x)=>s+(x.tz-mz)**2,0)/sensor._buf.length);
+      const sdx=Math.sqrt(sensor._buf.reduce((s,x)=>s+(x.tx-mx)**2,0)/sensor._buf.length);
+      const sd=Math.max(sdz,sdx);
       const magOk=Math.abs(sensor._buf[sensor._buf.length-1].mag-9.81)<1.2;
       const rotOk=!sensor.hasRot||curRotMag()<3.0;
       sensor.noise=sd;
-      // 0.28° raw-sample tolerance rides out hand tremor; captures average
-      // ~80 samples so the stored number is still good to ~0.03°.
-      if(sd<0.28&&magOk&&rotOk){if(!sensor.stillSince)sensor.stillSince=now;}
+      // Generous on purpose: a phone strapped to a gauge bar with rubber
+      // bands has real mechanical play beyond pure hand tremor. Captures
+      // still average ~80 samples on top of this, so the stored number
+      // stays precise even though this gate itself is forgiving.
+      if(sd<0.5&&magOk&&rotOk){if(!sensor.stillSince)sensor.stillSince=now;}
       else sensor.stillSince=0;
     }
   }
@@ -845,13 +858,20 @@ function onMotion(e){
   }
   sensor.lastEvt=now;sensor.on=true;
 }
-// Scaled by gyroScale so the thresholds at both call sites (tuned assuming
-// roughly-correct raw units) stay meaningful on a device where the raw
-// rotation rate itself is under/over-counted — otherwise a real slow turn
-// can misread as "basically stationary" on a device with the scale bug,
-// confirmed 2026-09-10 to cause sloppy caster auto-capture (overshoot past
-// the ±15° target before the steadiness gate ever disqualifies it).
-function curRotMag(){const r=sensor._rot;return Math.hypot(r[0],r[1],r[2])*(S.gyroScale||1);}
+// NOT scaled by gyroScale. Tried that (2026-09-10, to fix sloppy caster
+// auto-capture overshoot on a device with a large learned scale) and it
+// was wrong: this function gates the general EMA smoothing switch and
+// isSteady()'s rotOk check, used on EVERY screen (camber/toe/zero/floor),
+// not just caster. Scaling it up meant ordinary resting hand tremor got
+// amplified past the "moving" thresholds almost everywhere once a real
+// scale was learned — live readouts turned jittery and captures failed
+// with "too shaky" no matter how still the phone actually was, confirmed
+// 2026-09-11 on a real device. A narrow caster-only overshoot problem is
+// far cheaper than a broken stillness detector app-wide; reverted. If
+// caster overshoot on a high-scale device turns out to be a real,
+// reported problem, fix it scoped inside caster's own capture logic —
+// never by scaling this shared function again.
+function curRotMag(){const r=sensor._rot;return Math.hypot(r[0],r[1],r[2]);}
 function isSteady(holdMs=500){return sensor.stillSince&&(performance.now()-sensor.stillSince>holdMs);}
 function sample(ms=1100){
   return new Promise(res=>{
