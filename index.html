@@ -283,22 +283,26 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     <div class="card">
       <h2>4 · Measure the floor</h2>
       <p class="hint">The fix for a floor that isn’t level. A sideways slope leans the whole vehicle, which shifts every camber reading. <b>Caster and toe don’t need this</b> — the way they’re measured cancels floor slope out.</p>
-      <p class="hint">What tilts the truck is the <b>height difference between the two tire contact patches</b> — not how the concrete happens to slope at any one spot. So the bar gets <b>walked from tire to tire</b> along the axle line and the rises are added up. On a wavy floor that lands somewhere quite different from one measurement taken wherever the bar happened to fit, and it shows you how wavy the floor is while it does it.</p>
+      <p class="hint">What tilts the truck is the <b>height difference between the two tire contact patches</b> — not how the concrete happens to slope at any one spot. So you bridge straight across between the tires on a long straight edge that only touches at its two ends, and read the slope of that. High spots in between can’t lift it and dips in between can’t fool it.</p>
       <div class="grid2" style="margin-top:10px">
-        <div class="field"><label>Bar length ″</label><input id="barLen" type="number" step="1" min="6" inputmode="decimal"></div>
+        <div class="field"><label>Straight edge ″</label><input id="barLen" type="number" step="1" min="12" inputmode="decimal"></div>
         <div class="field"><label>Track width ″</label><input id="trackW" type="number" step="0.5" min="20" inputmode="decimal"></div>
       </div>
-      <p class="small" style="margin-top:4px">Track = tire centre to tire centre across the axle. Bar length decides how many placements a walk needs.</p>
+      <p class="small" style="margin-top:4px">Track = tire centre to tire centre across the axle. A straight edge shorter than the track is fine — centre it between the tires; a slope is a slope whether you read it over 48″ or 55″.</p>
       <div class="steps" style="margin-top:10px" id="floorSteps"></div>
       <div class="bubblewrap"><svg class="bubble" id="bubFloor"></svg></div>
       <div class="btnrow" style="margin-top:6px">
-        <button class="btn primary" id="btnFloorGo">Walk front axle</button>
-        <button class="btn" id="btnFloorGoR">Walk rear axle</button>
+        <button class="btn primary" id="btnFloorGo">Measure front axle</button>
+        <button class="btn" id="btnFloorGoR">Measure rear axle</button>
         <button class="btn ghost" id="btnFloorStop">Stop</button>
         <button class="btn ghost" id="btnFloorZeroOut">Assume level</button>
       </div>
       <div class="hint" id="floorState" style="margin-top:8px">No floor slope stored.</div>
       <p class="small" id="floorShim" style="margin-top:6px"></p>
+      <details style="margin-top:6px"><summary>Do the two blocks have to be exactly the same thickness?</summary><div class="dbody">
+        <b>If they’re taped to the straight edge: no, not even close.</b> Turning it end for end swaps which block sits on which spot, so a mismatch tilts the first reading one way and the second reading the other way by the same amount, and the pair averages it out — the same trick that already kills the phone’s own zero error. That is the whole reason to attach them.
+        <p>If you leave the blocks loose on the floor and just flip the edge onto them, the mismatch stays put and becomes part of the answer: <span id="shimErrNote"></span> Tape them on and stop thinking about it.</p>
+      </div></details>
       <p class="small" style="margin-top:6px">Measure the rear-axle line too if you’ll be doing rear camber. Re-measure whenever the vehicle gets rolled to a new spot.</p>
     </div>
 
@@ -385,26 +389,37 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <h2>Steering sweep</h2>
-      <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays on one front wheel; the app tracks how far you’ve steered and grabs camber at 0°, +15° and −15° automatically. Floor slope and gauge zero cancel out on their own here.</p>
-      <p class="hint"><b>Sweep each wheel two or three times, re-seating the phone on the bar between sweeps.</b> Caster divides a camber difference by sin(+15°)−sin(−15°) = 0.518, so every bit of hand-held placement scatter comes back magnified about 1.9× — a fifth of a degree of sloppiness lands outside the ±0.5° spec. Sweeps add up like camber readings do, and the tile reports the spread so you can see whether to trust the number.</p>
+      <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing with its gyro and grabs camber at each end by itself.</p>
+      <p class="hint"><b>You don’t have to hit any particular angle, and you don’t have to look at anything.</b> Steer until the wheel stops, hold it there, and it captures — then tells you out loud what it got. The maths uses the angle you actually reached, whatever it was, so the steering stop makes a perfect reference: it’s the same place every single time and you can feel it.</p>
+      <p class="hint"><b>Going to the stops is also more accurate than the old ±15°.</b> Caster comes from a camber difference divided by sinθL−sinθR. At ±15° that divisor is 0.518, so every bit of hand-placement scatter comes back <b>1.9× bigger</b>. At full lock, around ±35°, the divisor is about 1.15 — it <b>shrinks</b> the scatter to 0.87× instead. End to end that is a bit over <b>twice as steady</b> a number for the same sloppiness.</p>
+      <p class="hint"><b>Your two stops don’t have to match, and they won’t.</b> Steering stops are rarely symmetric. The app solves caster and SAI together from the two angles you actually reached rather than assuming they mirror each other — assuming it would have quietly leaked your SAI into the caster number, about a quarter of a degree at a typical 37°/33° pair. Just go to the stop on each side and let it read whatever it reads.</p>
+      <p class="hint"><b>Still sweep each wheel two or three times, re-seating the phone between sweeps.</b> Sweeps add up like camber readings, and the tile reports the spread so you can see whether to trust the number.</p>
+      <div class="field" style="margin-top:10px"><label>Sweep style</label>
+        <select id="sweepMode">
+          <option value="stops">Steer to the stops — hands-free, spoken</option>
+          <option value="deg">Steer to ±15° — watching the phone</option>
+        </select>
+      </div>
       <div class="note" style="margin-top:8px">Engine off, <b>brake held hard</b> the whole sweep — a helper or a board wedged from the seat to the pedal. Front tires on something slippery (two vinyl tiles with grease between, or a pair of plastic bags each) so they can pivot.</div>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn primary" id="btnCasL">Add LF sweep</button>
         <button class="btn primary" id="btnCasR">Add RF sweep</button>
         <button class="btn ghost" id="btnCasAbort">Stop</button>
+        <button class="btn ghost" id="btnCasVoice">Voice: on</button>
       </div>
       <div class="steps" style="margin-top:10px">
-        <div class="step" id="cstep1"><div class="stepn">1</div><div class="stept">Wheels straight, bar on the wheel, hold still — app zeros and reads center camber.</div></div>
-        <div class="step" id="cstep2"><div class="stepn">2</div><div class="stept">Steer <b>LEFT</b> slowly until the dial reads +15° — hold, it captures.</div></div>
-        <div class="step" id="cstep3"><div class="stepn">3</div><div class="stept">Steer <b>RIGHT</b> through center to −15° — hold, it captures and computes.</div></div>
+        <div class="step" id="cstep1"><div class="stepn">1</div><div class="stept"></div></div>
+        <div class="step" id="cstep2"><div class="stepn">2</div><div class="stept"></div></div>
+        <div class="step" id="cstep3"><div class="stepn">3</div><div class="stept"></div></div>
       </div>
       <div class="wheels" style="margin-top:12px">
         <div class="wtile"><div class="wname">LF caster</div><div class="wval mono" id="casLFv">–</div><div class="wsub" id="casLFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="LF">clear</button></div>
         <div class="wtile"><div class="wname">RF caster</div><div class="wval mono" id="casRFv">–</div><div class="wsub" id="casRFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="RF">clear</button></div>
       </div>
-      <details><summary>Can’t reach 15° or reading looks wrong?</summary><div class="dbody">
-        Any swing of at least ±8° works — hold still anywhere past 8° for ~3 seconds and it captures there; the math uses the exact angle you actually steered.
+      <details><summary>Tires won’t turn far, or the reading looks wrong?</summary><div class="dbody">
+        <b>Any swing past ±8° is a valid sweep.</b> If the tires won’t pivot far enough to reach the stops — not slippery enough, or the brake creeping — just steer as far as they will go, stop, and hold. It captures wherever you stopped and uses that exact angle. A small swing isn’t wrong, only noisier: at ±8° expect roughly twice the scatter of ±15°, so take more sweeps to make up for it.
         If caster comes out around <b>−3° when +3° is expected</b>, the turn direction is flipped on your phone: use <span class="kbd">Flip turn sign</span> in Setup → Sensor details and re-run the sweep.
+        <div style="margin-top:6px">Nothing beeping? The phone’s ringer switch mutes the web-audio guidance on some iPhones — flick it off silent, or turn <b>Voice</b> off and watch the dial instead.</div>
         <div style="margin-top:6px">SAI (steering-axis lean, small print under each result) is a free diagnostic: if one side differs a lot from the other with normal camber, suspect a bent spindle or strut.</div>
       </div></details>
       <details><summary>Adjusting caster on this vehicle</summary><div class="dbody" id="advCaster"></div></details>
@@ -683,15 +698,11 @@ const store={
 /* ---------- pure math (exposed for tests) ---------- */
 function zeroFrom(r1,r2,r3){const f=(r1-r2)/2,p=(r1+r3)/2;return{f,p,off:f+p,c:r1-f-p};}
 function floorFrom(sA,sB){return{slope:(sA-sB)/2,bias:(sA+sB)/2};}
-/* Chord slope across a span walked in segments. Each placement of length Lᵢ
-   tilted θᵢ raises the far end by Lᵢ·sinθᵢ; the vehicle's roll is the total
-   rise over the track, asin(ΣLᵢ·sinθᵢ / track). segs and slopes are index
-   aligned and segs sums to track (the last entry is the short remainder,
-   measured by a full-length placement that overlaps its predecessor). */
-function floorChord(segs,slopes,track){
-  const rise=slopes.reduce((a,sl,i)=>a+segs[i]*Math.sin(R(sl)),0);
-  return D(Math.asin(clamp(rise/track,-1,1)));
-}
+/* shimOffsetError: if the two end blocks under the straight edge differ in
+   thickness by dh over a span L, how many degrees of false slope is that?
+   Only applies when the blocks are left loose on the floor — see the note in
+   the floor flow for why taping them to the edge cancels it outright. */
+function shimOffsetError(dh,span){return D(Math.atan(dh/span));}
 // signed shortest-path delta from a to b, in (-180,180]
 function headingStepDeltaPure(a,b){return((b-a+540)%360)-180;}
 /* Compass-referenced gyro calibration. calRaw = the SAME bias-corrected wz
@@ -714,13 +725,40 @@ function gyroCalFrom(calRaw,compassDelta,opts={}){
   const gs=Math.sign(compassDelta)*Math.sign(calRaw);
   return{valid:true,gs,scale};
 }
+/* Steering a wheel by θ about a steering axis that is tilted back by caster C
+   and inboard by SAI S swings the wheel's camber by, exactly in θ and to first
+   order in C and S (Rodrigues about the steering axis):
+
+       camber(θ) − camber(0) = C·sinθ − S·(1−cosθ)
+
+   Note what is and isn't approximated: it is linear in C and S, which are a
+   few degrees, but it is EXACT in θ. Large sweeps do not break this formula.
+
+   The old code divided the camber difference by (sinθL−sinθR) to get C, which
+   silently assumes θR = −θL. Work it through without that assumption and the
+   S term does not cancel:
+
+       (cL−cR)/(sinθL−sinθR) = C − S·(cosθR−cosθL)/(sinθL−sinθR)
+
+   Perfectly harmless at a matched ±15°, where cosθR = cosθL kills it. Not
+   harmless when you steer to the mechanical stops, which are not symmetric:
+   at +37°/−33° with a typical 8° SAI that leftover term is 0.28° of caster,
+   more than half the ±0.5° spec, and it would look like a real reading.
+
+   So solve both unknowns from both readings instead — two equations, two
+   unknowns, no symmetry assumed. When the sweep IS symmetric this reduces
+   algebraically to the old expressions, and its noise gain is within 1% of
+   the old one even when badly asymmetric, so there is nothing to trade off.
+   It also conditions SAI far better at large angles, where (1−cosθ) is big
+   instead of the 0.034 you get at 15°. */
 function casterFrom(thL,cL,thR,cR,c0){
-  const den=Math.sin(R(thL))-Math.sin(R(thR));
-  if(Math.abs(den)<0.15)return null;
-  const caster=(cL-cR)/den;
-  const evenDen=(1-Math.cos(R(thL)))+(1-Math.cos(R(thR)));
-  const sai=evenDen>0.01?-((cL+cR-2*c0)/evenDen):null;
-  return{caster,sai};
+  const sL=Math.sin(R(thL)),sR=Math.sin(R(thR));
+  if(Math.abs(sL-sR)<0.15)return null;                 // swing too small to divide by
+  const uL=1-Math.cos(R(thL)),uR=1-Math.cos(R(thR));
+  const dL=cL-(c0||0),dR=cR-(c0||0);
+  const det=sR*uL-sL*uR;
+  if(Math.abs(det)<1e-6)return null;                   // both stops on the same side
+  return{caster:(uL*dR-uR*dL)/det, sai:(sL*dR-sR*dL)/det};
 }
 function toeReduce(stations){
   // stations: [{id, t, psi}] — first and last share an id (closure)
@@ -751,7 +789,7 @@ function toeReduce(stations){
   }
   return out;
 }
-window.__align={zeroFrom,floorFrom,floorChord,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
+window.__align={zeroFrom,floorFrom,shimOffsetError,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES={
@@ -803,8 +841,10 @@ const S={
   rollZero:store.get("rollZero",0),     // plumb-axis offset, zeroed against a trusted external level
   levelZero:store.get("levelZero",0),   // level-axis offset, same idea for the horizontal hold
   specs:store.get("specs",{}),          // per-vehicle overrides
-  floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,slopes,segs}, rear:{...}}
-  barLen:store.get("barLen",48),        // length of the straightedge, inches — sets how many placements a floor walk needs
+  floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
+  barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
+  sweepMode:store.get("sweepMode","stops"), // caster sweep: "stops" = steer to full lock, "deg" = steer to a set angle
+  voiceOn:store.get("voiceOn",true),    // spoken guidance during the caster sweep
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
   past:store.get("past",[])
@@ -960,6 +1000,30 @@ const liveRollError=g=>rollError(g)-(S.rollZero||0);
 const liveLevelError=g=>levelError(g)-(S.levelZero||0);
 window.__align.liveRollError=liveRollError;window.__align.liveLevelError=liveLevelError;
 function waitSteady(preMs=800){return new Promise(r=>{const iv=setInterval(()=>{if(isSteady(preMs)){clearInterval(iv);r(true);}},100);});}
+
+/* ---------- talking to James while his hands are on the wheel ----------
+   The phone is taped to the front wheel and he is sitting in the cab: during
+   a caster sweep he cannot see the screen, cannot see the tire, and cannot
+   free a hand. Anything the readout says therefore has to exist as a sound
+   too, or the sweep is guesswork. iOS only lets speech start from a user
+   gesture, so the first utterance has to be fired from the sweep button's own
+   click handler — do not move it into an async continuation. */
+function say(t){
+  if(!S.voiceOn)return;
+  try{const u=new SpeechSynthesisUtterance(t);u.rate=1;u.volume=1;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
+}
+function hush(){try{speechSynthesis.cancel();}catch(e){}}
+// A sweep takes a minute or two of him not touching the phone. iOS will dim
+// and lock the screen on its own, and a locked screen stops DeviceMotion
+// dead — which would abandon the sweep silently, halfway through.
+let wakeLock=null;
+async function keepAwake(on){
+  try{
+    if(on){if(!wakeLock&&navigator.wakeLock)wakeLock=await navigator.wakeLock.request("screen");}
+    else if(wakeLock){const w=wakeLock;wakeLock=null;await w.release();}
+  }catch(e){wakeLock=null;}
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&cas.run)keepAwake(true);});
 
 /* ---------- permission / diagnostics ---------- */
 async function enableSensors(){
@@ -1217,42 +1281,48 @@ function zeroUI(){for(let i=1;i<=3;i++){const el=$("zstep"+i);el.classList.toggl
    — i.e. a real garage slab — they are not, which is exactly the "it reads
    different depending on where I measure it" problem.
 
-   So: walk the bar along the tire-to-tire line and integrate. A placement of
-   length L contributes rise L·sinθ, and the chord slope is
-   asin(Σ Lᵢ·sinθᵢ / track). Placements butt end to end; the last one is
-   positioned to finish ON the far contact patch, so it overlaps its
-   predecessor instead of overshooting past the tire (using a longer
-   segment's slope for the shorter remainder it contains is the right
-   approximation — overshooting would average in floor the truck isn't on).
-   The bar's own zero bias is cancelled once, by the 180° spin pair at
-   placement 1 — floorFrom already separates slope from bias — and then
-   subtracted from every later single capture. Same accuracy as spinning at
-   every station, for one spin instead of N.
+   An earlier attempt at this walked a short bar across in butted steps and
+   integrated the rises. It worked, but James wanted none of it, and he was
+   right: bridging the gap in one shot measures the chord directly instead of
+   reconstructing it, and there is no step-to-step bookkeeping to get wrong.
+
+   So: one long straight edge, standing on a block at each end so the middle
+   hangs clear. The two blocks ARE the two contact points, which is the whole
+   point — a high spot between them cannot lift the edge and a dip between
+   them cannot fool it, so what it reads is the chord and nothing else.
+
+   Then the same 180° trick as the gauge zero: read it, turn it end for end
+   into the same footprint, read it again, and floorFrom takes the half
+   difference. That cancels the phone's own zero error — and, if the blocks
+   are attached to the edge rather than left loose on the floor, it cancels
+   any mismatch in their thickness too, because turning the edge swaps which
+   block sits on which spot. Reading A carries +Δh/L and reading B carries
+   −Δh/L, and the pair averages it to nothing. Loose blocks stay put and
+   their mismatch survives as real error — see shimOffsetError().
+
+   One approximation is left: a 48″ edge on a 55.5″ track reads the slope of
+   the middle 48″ and we apply it across the whole span. Centre it and the
+   error stays small — on simulated slabs with a 0.05–0.15″ wave it runs
+   0.01–0.07° RMS, against a ±0.5° camber tolerance, and about half what you
+   get by shoving the edge to one side instead of centring it.
 
    Sign convention is unchanged and must stay that way: the phone's top
    points at the PASSENGER side for every forward capture, so a positive
    result still means passenger side low, which is what camberCorrection()
    expects (+slope on left wheels, −slope on right).                       */
 let floorBusy=false, floorStop=false;
-function floorPlan(){
-  const L=barIn(), T=Math.max(20,trackIn());
-  const N=Math.max(1,Math.ceil(T/L-1e-9));
-  const segs=[];
-  for(let i=1;i<=N;i++)segs.push(i<N?L:+(T-(N-1)*L).toFixed(2));
-  return{L,T,N,segs};
-}
 function floorStepsUI(active=0){
-  const{N,segs}=floorPlan();
+  const L=barIn(), T=Math.max(20,trackIn());
+  const steps=[
+    "<b>Tape a block of the same thickness under each end</b> of the straight edge, so the middle hangs clear of the floor. Anything consistent works — two washers, two nuts, two scraps of the same plywood. They want to be <i>attached to the edge</i>, not left loose on the floor (see below).",
+    "Set it <b>across the truck between the two tire contact patches</b>, blocks down, centred on the span, <b>top of phone toward the passenger side</b>. Nothing but the two blocks touching. Hold still.",
+    "<b>Pick it up and turn it end for end</b> — same footprint, blocks back in the same two spots, top of phone now toward the driver side. Hold still. That pair is what cancels the phone’s own zero error."
+  ];
   let h="";
-  for(let i=1;i<=N;i++){
-    let t;
-    if(i===1)t=(N===1)
-      ?"Lay the bar <b>flat on the floor across the vehicle</b>, one end on the <b>driver</b> tire’s contact patch and the other reaching the <b>passenger</b> tire, <b>top of phone toward the passenger side</b>. Hold still — then spin it <b>180°</b> in place and hold again."
-      :"Lay the bar <b>flat on the floor along the tire-to-tire line</b>, near end on the <b>driver</b> tire’s contact patch, <b>top of phone toward the passenger side</b>. Hold still — then spin it <b>180°</b> in place and hold again. That pair cancels the bar’s own bias once, for the whole walk.";
-    else if(i<N)t="Slide the bar <b>one full length</b> toward the passenger side — near end where the far end just was. Top of phone still toward the passenger side. Hold still.";
-    else t="Last one: put the bar’s <b>far end right on the passenger tire’s contact patch</b>. It will overlap the previous placement — that’s intended, not a mistake. Hold still.";
-    h+='<div class="step'+(i===active?" now":"")+'" id="fstep'+i+'"><div class="stepn">'+i+'</div><div class="stept">'+t+' <span class="small">· counts as '+segs[i-1]+'″ of the span</span></div></div>';
-  }
+  for(let i=1;i<=steps.length;i++)
+    h+='<div class="step'+(i===active?" now":"")+'" id="fstep'+i+'"><div class="stepn">'+i+'</div><div class="stept">'+steps[i-1]+'</div></div>';
+  h+='<p class="small" style="margin-top:6px">Reading the slope over '+L+'″ and applying it across a '+T+'″ track'+
+     (L<T?" — centre the edge between the tires so the bit you skip is split evenly at both ends.":".")+'</p>';
   $("floorSteps").innerHTML=h;
 }
 function waitSteadyOrStop(preMs){
@@ -1266,39 +1336,27 @@ async function floorRun(axle){
   if(floorBusy)return; floorBusy=true; floorStop=false;
   const LBL=axle==="front"?"FRONT":"REAR";
   try{
-    const{T,N,segs}=floorPlan();
-    const slopes=[];let bias=0;
-    for(let i=1;i<=N;i++){
-      floorStepsUI(i);
-      if(i===1){
-        $("floorState").textContent=LBL+" axle · placement 1 of "+N+": bar flat on the floor at the DRIVER tire, top of phone toward the PASSENGER side — hold still…";
-        await waitSteadyOrStop(800);
-        const a=await sample(1200);flash();beep(1200,0.1);
-        $("floorState").textContent=LBL+" axle · now spin the bar 180° in place (top toward the DRIVER side) — hold still…";
-        await new Promise(r=>setTimeout(r,2000));
-        await waitSteadyOrStop(800);
-        const b=await sample(1200);flash();beep(1320,0.12);
-        const f=floorFrom(tiltY(a.g),tiltY(b.g));
-        bias=f.bias;slopes.push(f.slope);
-      }else{
-        $("floorState").textContent=LBL+" axle · placement "+i+" of "+N+": "+(i<N?"slide the bar one full length toward the passenger side":"far end on the PASSENGER tire’s contact patch")+", top of phone toward the PASSENGER side — hold still…";
-        await new Promise(r=>setTimeout(r,2000));
-        await waitSteadyOrStop(800);
-        const c=await sample(1200);flash();beep(i<N?1200:1320,0.1);
-        slopes.push(tiltY(c.g)-bias);
-      }
-      const el=$("fstep"+i);if(el){el.classList.remove("now");el.classList.add("done");}
-    }
-    const slope=floorChord(segs,slopes,T);
+    floorStepsUI(2);
+    $("floorState").textContent=LBL+" axle · straight edge on its blocks between the tires, top of phone toward the PASSENGER side — hold still…";
+    await waitSteadyOrStop(800);
+    const a=await sample(1400);flash();beep(1200,0.1);
+    $("fstep2").classList.remove("now");$("fstep2").classList.add("done");
+    floorStepsUI(3);$("fstep1").classList.add("done");$("fstep2").classList.add("done");
+    $("floorState").textContent=LBL+" axle · now turn it end for end into the same two spots — hold still…";
+    await new Promise(r=>setTimeout(r,2500));
+    await waitSteadyOrStop(800);
+    const b=await sample(1400);flash();beep(1320,0.12);
+    $("fstep3").classList.remove("now");$("fstep3").classList.add("done");
+    const f=floorFrom(tiltY(a.g),tiltY(b.g));
     if(!S.floors[S.veh])S.floors[S.veh]={};
-    S.floors[S.veh][axle]={slope,when:Date.now(),slopes,segs:segs.slice(),bias,track:T,barLen:barIn()};
+    S.floors[S.veh][axle]={slope:f.slope,when:Date.now(),bias:f.bias,span:barIn(),track:trackIn()};
     store.set("floors",S.floors);
     floorStateUI();setChip("chipFloor",true);
     camUI();renderResults();
-    toast((axle==="front"?"Front":"Rear")+" floor "+fmt(slope)+"° across "+T+"″ ("+N+" placement"+(N>1?"s":"")+")");
+    toast((axle==="front"?"Front":"Rear")+" floor "+fmt(f.slope)+"° over "+barIn()+"″");
   }catch(e){
-    $("floorState").textContent="Walk stopped — nothing stored. Start it again when you’re ready.";
-  }finally{floorBusy=false;floorStop=false;}
+    $("floorState").textContent="Stopped — nothing stored. Start it again when you’re ready.";
+  }finally{floorBusy=false;floorStop=false;floorStepsUI(0);}
 }
 function floorZeroOut(){
   if(floorBusy)return;
@@ -1311,11 +1369,8 @@ function floorStateUI(){
     const m=f[a];
     if(!m)return "<b>not measured</b>";
     let t="<b>"+fmt(m.slope)+"° ("+(m.slope>0?"passenger":m.slope<0?"driver":"neither")+" low)</b>";
-    if(m.slopes&&m.slopes.length>1){
-      const lo=Math.min.apply(null,m.slopes),hi=Math.max.apply(null,m.slopes);
-      t+=' <span class="small">· '+m.slopes.length+" placements, local slope ran "+fmt(lo)+"…"+fmt(hi)+"°"+
-         (hi-lo>0.3?" — that spread is why one spot wasn’t enough":"")+"</span>";
-    }
+    if(m.span)t+=' <span class="small">· read over '+m.span+"″, applied across "+(m.track||trackIn())+"″</span>";
+    else if(m.slopes)t+=' <span class="small">· older walked measurement, '+m.slopes.length+" placements</span>";
     return t;
   };
   $("floorState").innerHTML="Front axle: "+bit("front")+"<br>Rear axle: "+bit("rear");
@@ -1397,11 +1452,17 @@ function camSignFix(side){
 }
 
 /* ---------- caster sweep ---------- */
-const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false};
+const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false,_lastBeep:0};
+const CAS_MIN=8;   // below this the sweep is too small for the divisor to be trustworthy
 async function casterStart(wheel){
   if(!sensor.on){toast("Enable sensors first");return;}
   if(!sensor.hasRot){toast("No gyro on this device — caster sweep unavailable");return;}
   if(S.gyroSign===0){toast("Do the flat check first (Setup step 2) so turn direction is known");return;}
+  // Both of these have to be kicked off from inside the click itself: iOS
+  // unlocks speech and audio on a user gesture and nowhere else.
+  say("Starting "+wheel+". Wheels straight, hold the bar still.");
+  beep(900,0.05,0.2);
+  keepAwake(true);
   cas.run=true;cas.wheel=wheel;cas.phase=1;cas.c0=cas.thL=cas.cL=cas.thR=cas.cR=null;
   casUI();
   $("casMode").textContent="Caster sweep · "+wheel;
@@ -1413,16 +1474,45 @@ async function casterStart(wheel){
   sensor.yaw=0;sensor.yawRun=true;
   cas.c0=(S.camSign[cas.wheel]||1)*tiltZ(s0.g);
   cas.phase=2;casUI();flash();beep(1200,0.1);
-  toast("Steer LEFT to +"+cas.target+"°");
+  if(S.sweepMode==="stops"){
+    toast("Centre set — go steer LEFT to the stop and hold");
+    say("Centre set. Go and steer left until it stops, then hold it there.");
+  }else{
+    toast("Steer LEFT to +"+cas.target+"°");
+    say("Centre set. Steer left to "+cas.target+" degrees.");
+  }
 }
-function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;casUI();$("casMode").textContent="Caster sweep";}
+function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
 async function casterGrab(which){
   const s=await sample(1100);
   const camb=(S.camSign[cas.wheel]||1)*tiltZ(s.g);
   const th=sensor.yaw;
-  if(which==="L"){cas.thL=th;cas.cL=camb;cas.phase=3;flash();beep(1200,0.1);toast("Got it — steer RIGHT through center to −"+cas.target+"°");}
-  else{cas.thR=th;cas.cR=camb;cas.phase=4;flash();beep(1320,0.15);finishCaster();}
+  const deg=Math.round(Math.abs(th));
+  if(which==="L"){
+    cas.thL=th;cas.cL=camb;cas.phase=3;flash();beep(1200,0.1);
+    toast("Got it at "+fmt(th,1)+"° — now steer RIGHT through centre");
+    say("Got it. "+deg+" degrees left. Now steer right, through the middle, "+(S.sweepMode==="stops"?"to the other stop.":"to minus "+cas.target+" degrees."));
+  }else{
+    cas.thR=th;cas.cR=camb;cas.phase=4;flash();beep(1320,0.15);
+    say("Got it. "+deg+" degrees right.");
+    finishCaster();
+  }
   casUI();
+}
+// Audio guidance, because he cannot see the screen from the driver's seat.
+// Under the minimum swing: slow low pulse, "keep turning". Past it: fast
+// bright pulse, "anywhere from here is fine, stop and hold". Once he is
+// holding still: slow soft tick, "I can see you, keep it there" — silence
+// would be indistinguishable from the app having died.
+function casGuide(psi,dir,far,held){
+  if(cas._busy)return;
+  const now=performance.now();
+  let iv,f,v;
+  if(far&&held>500){iv=900;f=760;v=0.12;}
+  else if(far){iv=260;f=1180;v=0.30;}
+  else if(Math.sign(psi)===dir&&Math.abs(psi)>2.5){iv=820;f=620;v=0.22;}
+  else return;
+  if(now-cas._lastBeep>=iv){cas._lastBeep=now;beep(f,0.05,v);}
 }
 /* Multi-sweep averaging — same reasoning as camber, but with more at stake.
    caster = Δcamber/(sinθL−sinθR). At a ±15° sweep that denominator is
@@ -1447,9 +1537,9 @@ function casStat(sweeps){
   return{sweeps,n,caster,sd,se:(sd!=null?sd/Math.sqrt(n):null),sai:sa.length?avg(sa):null,when:Date.now()};
 }
 function finishCaster(){
-  cas.run=false;sensor.yawRun=false;
+  cas.run=false;sensor.yawRun=false;keepAwake(false);
   const r=casterFrom(cas.thL,cas.cL,cas.thR,cas.cR,cas.c0);
-  if(!r){toast("Sweep too small — try again with a bigger swing");cas.phase=0;casUI();return;}
+  if(!r){toast("Sweep too small — try again with a bigger swing");say("Sweep too small. Try again with a bigger swing.");cas.phase=0;casUI();return;}
   const prev=S.sess.cas[cas.wheel];
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([{caster:r.caster,sai:r.sai,thL:cas.thL,thR:cas.thR,c0:cas.c0}]);
   S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
@@ -1457,8 +1547,22 @@ function finishCaster(){
   casUI();renderResults();
   const m=S.sess.cas[cas.wheel];
   toast(`${cas.wheel} caster ${fmt(m.caster)}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat the phone and sweep again"));
+  say("Caster "+m.caster.toFixed(1)+" degrees"+(m.sd!=null?", spread "+m.sd.toFixed(2):"")+". "+(m.n<3?"Re-seat the phone and sweep again.":""));
 }
 function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
+function casStepsUI(){
+  const stops=S.sweepMode==="stops";
+  const t=stops?[
+    "Wheels straight, bar taped on the wheel, tap a sweep button and <b>hold the bar still</b> until it chirps — that’s the centre reading. Then walk to the cab; the wheel isn’t moving, so nothing is lost while you do.",
+    "Steer <b>LEFT until the wheel stops</b> and hold it against the stop. Slow low beeps mean keep going; <b>fast bright beeps mean you’re far enough</b> to stop anywhere. Hold still and it captures, then says the angle out loud.",
+    "Steer <b>RIGHT through centre to the other stop</b> and hold. Same beeps. It captures, works out caster and SAI from the two angles you actually reached, and reads the caster back to you."
+  ]:[
+    "Wheels straight, bar on the wheel, hold still — app zeros and reads centre camber.",
+    "Steer <b>LEFT</b> slowly until the dial reads +"+cas.target+"° — hold, it captures.",
+    "Steer <b>RIGHT</b> through centre to −"+cas.target+"° — hold, it captures and computes."
+  ];
+  for(let i=1;i<=3;i++){const el=$("cstep"+i);if(el)el.querySelector(".stept").innerHTML=t[i-1];}
+}
 function casUI(){
   for(let i=1;i<=3;i++){const el=$("cstep"+i);el.classList.toggle("done",cas.phase>i);el.classList.toggle("now",cas.phase===i);}
   for(const w of["LF","RF"]){
@@ -1726,6 +1830,9 @@ function vehApply(){
   $("advToe").innerHTML=p.advToe;
   $("barLen").value=barIn();
   $("trackW").value=trackIn();
+  $("shimErrNote").innerHTML="over "+barIn()+"″, a <sup>1</sup>⁄<sub>32</sub>″ mismatch is "+
+    shimOffsetError(1/32,barIn()).toFixed(2)+"° of false slope and <sup>1</sup>⁄<sub>8</sub>″ is "+
+    shimOffsetError(1/8,barIn()).toFixed(2)+"° — against a ±"+spec().camT+"° camber tolerance.";
   specLoad();floorStepsUI(0);floorStateUI();renderResults();
 }
 function vehChange(v){
@@ -1781,19 +1888,32 @@ function tick(){
       $("roCas").innerHTML=fmt(psi,1)+'<span class="u">°</span>';
       const camb=(S.camSign[cas.wheel]||1)*tiltZ(sensor.g);
       $("roCasA").textContent="camber "+fmt(camb)+"°";
-      const tgt=cas.phase===2?cas.target:-cas.target;
-      $("roCasB").textContent="steer to "+fmt(tgt,0)+"°";
-      drawBubble($("bubCas"),psi,{span:20,target:tgt,tol:0.5});
-      if(!cas._busy){
-        if(Math.abs(psi-tgt)<=0.5&&steadyNow){cas._busy=true;casterGrab(cas.phase===2?"L":"R").finally(()=>cas._busy=false);}
-        else if(Math.abs(psi)>=8&&Math.sign(psi)===Math.sign(tgt)&&sensor.stillSince&&performance.now()-sensor.stillSince>2800){cas._busy=true;casterGrab(cas.phase===2?"L":"R").finally(()=>cas._busy=false);}
+      const dir=cas.phase===2?1:-1;
+      const held=sensor.stillSince?performance.now()-sensor.stillSince:0;
+      const far=Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN;
+      const grab=()=>{cas._busy=true;casterGrab(dir>0?"L":"R").finally(()=>cas._busy=false);};
+      if(S.sweepMode==="deg"){
+        const tgt=dir*cas.target;
+        $("roCasB").textContent="steer to "+fmt(tgt,0)+"°";
+        drawBubble($("bubCas"),psi,{span:20,target:tgt,tol:0.5});
+        if(!cas._busy){
+          if(Math.abs(psi-tgt)<=0.5&&steadyNow)grab();
+          else if(far&&held>2800)grab();
+        }
+      }else{
+        // No target to hit: he steers to the mechanical stop and holds, and
+        // whatever angle that turns out to be is the angle the maths uses.
+        $("roCasB").textContent=far?"far enough — stop and hold":"steer "+(dir>0?"LEFT":"RIGHT")+" to the stop";
+        drawBubble($("bubCas"),psi,{span:45});
+        if(!cas._busy&&far&&held>1800)grab();
       }
+      casGuide(psi,dir,far,held);
     }else{
       $("roCas").classList.add("dead");
       $("roCas").innerHTML='––.–<span class="u">°</span>';
       $("roCasA").textContent=sensor.hasRot?"ready":"no gyro";
       $("roCasB").textContent="";
-      drawBubble($("bubCas"),null,{span:20});
+      drawBubble($("bubCas"),null,{span:S.sweepMode==="deg"?20:45});
     }
   }
   if(activeScr==="toe"&&sensor.on){
@@ -1856,6 +1976,15 @@ document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click"
 $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casterAbort);
+$("sweepMode").value=S.sweepMode;
+$("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();});
+casStepsUI();
+function casVoiceUI(){$("btnCasVoice").textContent="Voice: "+(S.voiceOn?"on":"off");}
+$("btnCasVoice").addEventListener("click",()=>{
+  S.voiceOn=!S.voiceOn;store.set("voiceOn",S.voiceOn);casVoiceUI();
+  if(S.voiceOn)say("Voice on.");else hush();
+});
+casVoiceUI();
 $("btnToeModeF").addEventListener("click",()=>toeSetMode("front"));
 $("btnToeModeA").addEventListener("click",()=>toeSetMode("all"));
 $("btnToeModeX").addEventListener("click",()=>toeSetMode("frame"));
