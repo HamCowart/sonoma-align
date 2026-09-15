@@ -282,19 +282,24 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <h2>4 · Measure the floor</h2>
-      <p class="hint">The fix for a floor that isn’t level. A sideways slope leans the whole vehicle, which shifts every camber reading. Measure the slope once per parking spot and the app corrects each side automatically. <b>Caster and toe don’t need this</b> — the way they’re measured cancels floor slope out.</p>
-      <div class="steps" style="margin-top:10px">
-        <div class="step" id="fstep1"><div class="stepn">1</div><div class="stept">Lay the bar (phone mounted) <b>flat on the floor across the vehicle</b>, right where the front tires sit, <b>top of phone pointing at the passenger side</b>. Hold still.</div></div>
-        <div class="step" id="fstep2"><div class="stepn">2</div><div class="stept">Spin the bar <b>180°</b> in place (top of phone now at the driver side). Hold still. The pair is averaged, which cancels sensor error.</div></div>
+      <p class="hint">The fix for a floor that isn’t level. A sideways slope leans the whole vehicle, which shifts every camber reading. <b>Caster and toe don’t need this</b> — the way they’re measured cancels floor slope out.</p>
+      <p class="hint">What tilts the truck is the <b>height difference between the two tire contact patches</b> — not how the concrete happens to slope at any one spot. So the bar gets <b>walked from tire to tire</b> along the axle line and the rises are added up. On a wavy floor that lands somewhere quite different from one measurement taken wherever the bar happened to fit, and it shows you how wavy the floor is while it does it.</p>
+      <div class="grid2" style="margin-top:10px">
+        <div class="field"><label>Bar length ″</label><input id="barLen" type="number" step="1" min="6" inputmode="decimal"></div>
+        <div class="field"><label>Track width ″</label><input id="trackW" type="number" step="0.5" min="20" inputmode="decimal"></div>
       </div>
+      <p class="small" style="margin-top:4px">Track = tire centre to tire centre across the axle. Bar length decides how many placements a walk needs.</p>
+      <div class="steps" style="margin-top:10px" id="floorSteps"></div>
       <div class="bubblewrap"><svg class="bubble" id="bubFloor"></svg></div>
       <div class="btnrow" style="margin-top:6px">
-        <button class="btn primary" id="btnFloorGo">Front axle floor</button>
-        <button class="btn" id="btnFloorGoR">Rear axle floor</button>
+        <button class="btn primary" id="btnFloorGo">Walk front axle</button>
+        <button class="btn" id="btnFloorGoR">Walk rear axle</button>
+        <button class="btn ghost" id="btnFloorStop">Stop</button>
         <button class="btn ghost" id="btnFloorZeroOut">Assume level</button>
       </div>
       <div class="hint" id="floorState" style="margin-top:8px">No floor slope stored.</div>
-      <p class="small" style="margin-top:6px">Measure the rear-axle spot too if you’ll be doing rear camber. Re-measure whenever the vehicle gets rolled to a new spot.</p>
+      <p class="small" id="floorShim" style="margin-top:6px"></p>
+      <p class="small" style="margin-top:6px">Measure the rear-axle line too if you’ll be doing rear camber. Re-measure whenever the vehicle gets rolled to a new spot.</p>
     </div>
 
     <div class="card">
@@ -348,11 +353,12 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
       <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
+      <p class="hint"><b>Take three or four readings per wheel, lifting the phone off the bar and re-seating it between each one.</b> Every tap adds a reading rather than replacing the last, and the tile shows the average, how far the readings scattered, and how tight that average is. Holding the phone by hand means each placement sits a little differently — that scatter is the real error here, and one reading can never show it to you. Tapping again <i>without</i> re-seating measures nothing new.</p>
       <div class="wheels" style="margin-top:10px">
-        <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Capture LF</button></div>
-        <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Capture RF</button></div>
-        <div class="wtile"><div class="wname">LR · rear</div><div class="wval mono" id="camLRv">–</div><div class="wsub" id="camLRs"></div><button class="btn" data-camcap="LR">Capture LR</button></div>
-        <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Capture RR</button></div>
+        <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LF">clear</button></div>
+        <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RF">clear</button></div>
+        <div class="wtile"><div class="wname">LR · rear</div><div class="wval mono" id="camLRv">–</div><div class="wsub" id="camLRs"></div><button class="btn" data-camcap="LR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LR">clear</button></div>
+        <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RR">clear</button></div>
       </div>
       <details><summary>First time? Set the lean direction</summary><div class="dbody">
         With the bar held on a wheel, <b>tip the top of the bar away from the vehicle</b>. The live number should go <b>up</b>. If it goes down, tap the button for the side you’re on — the app remembers.
@@ -380,10 +386,11 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     <div class="card">
       <h2>Steering sweep</h2>
       <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays on one front wheel; the app tracks how far you’ve steered and grabs camber at 0°, +15° and −15° automatically. Floor slope and gauge zero cancel out on their own here.</p>
+      <p class="hint"><b>Sweep each wheel two or three times, re-seating the phone on the bar between sweeps.</b> Caster divides a camber difference by sin(+15°)−sin(−15°) = 0.518, so every bit of hand-held placement scatter comes back magnified about 1.9× — a fifth of a degree of sloppiness lands outside the ±0.5° spec. Sweeps add up like camber readings do, and the tile reports the spread so you can see whether to trust the number.</p>
       <div class="note" style="margin-top:8px">Engine off, <b>brake held hard</b> the whole sweep — a helper or a board wedged from the seat to the pedal. Front tires on something slippery (two vinyl tiles with grease between, or a pair of plastic bags each) so they can pivot.</div>
       <div class="btnrow" style="margin-top:10px">
-        <button class="btn primary" id="btnCasL">Sweep LF</button>
-        <button class="btn primary" id="btnCasR">Sweep RF</button>
+        <button class="btn primary" id="btnCasL">Add LF sweep</button>
+        <button class="btn primary" id="btnCasR">Add RF sweep</button>
         <button class="btn ghost" id="btnCasAbort">Stop</button>
       </div>
       <div class="steps" style="margin-top:10px">
@@ -392,8 +399,8 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <div class="step" id="cstep3"><div class="stepn">3</div><div class="stept">Steer <b>RIGHT</b> through center to −15° — hold, it captures and computes.</div></div>
       </div>
       <div class="wheels" style="margin-top:12px">
-        <div class="wtile"><div class="wname">LF caster</div><div class="wval mono" id="casLFv">–</div><div class="wsub" id="casLFs"></div></div>
-        <div class="wtile"><div class="wname">RF caster</div><div class="wval mono" id="casRFv">–</div><div class="wsub" id="casRFs"></div></div>
+        <div class="wtile"><div class="wname">LF caster</div><div class="wval mono" id="casLFv">–</div><div class="wsub" id="casLFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="LF">clear</button></div>
+        <div class="wtile"><div class="wname">RF caster</div><div class="wval mono" id="casRFv">–</div><div class="wsub" id="casRFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="RF">clear</button></div>
       </div>
       <details><summary>Can’t reach 15° or reading looks wrong?</summary><div class="dbody">
         Any swing of at least ±8° works — hold still anywhere past 8° for ~3 seconds and it captures there; the math uses the exact angle you actually steered.
@@ -676,6 +683,15 @@ const store={
 /* ---------- pure math (exposed for tests) ---------- */
 function zeroFrom(r1,r2,r3){const f=(r1-r2)/2,p=(r1+r3)/2;return{f,p,off:f+p,c:r1-f-p};}
 function floorFrom(sA,sB){return{slope:(sA-sB)/2,bias:(sA+sB)/2};}
+/* Chord slope across a span walked in segments. Each placement of length Lᵢ
+   tilted θᵢ raises the far end by Lᵢ·sinθᵢ; the vehicle's roll is the total
+   rise over the track, asin(ΣLᵢ·sinθᵢ / track). segs and slopes are index
+   aligned and segs sums to track (the last entry is the short remainder,
+   measured by a full-length placement that overlaps its predecessor). */
+function floorChord(segs,slopes,track){
+  const rise=slopes.reduce((a,sl,i)=>a+segs[i]*Math.sin(R(sl)),0);
+  return D(Math.asin(clamp(rise/track,-1,1)));
+}
 // signed shortest-path delta from a to b, in (-180,180]
 function headingStepDeltaPure(a,b){return((b-a+540)%360)-180;}
 /* Compass-referenced gyro calibration. calRaw = the SAME bias-corrected wz
@@ -735,12 +751,12 @@ function toeReduce(stations){
   }
   return out;
 }
-window.__align={zeroFrom,floorFrom,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
+window.__align={zeroFrom,floorFrom,floorChord,casterFrom,toeReduce,gyroCalFrom,headingStepDeltaPure};
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES={
   sonoma:{
-    name:"1999 GMC Sonoma 2WD", short:"’99 Sonoma 2WD", tire:27.1,
+    name:"1999 GMC Sonoma 2WD", short:"’99 Sonoma 2WD", tire:27.1, track:55.5,
     spec:{cam:0.0,camT:0.5,camX:0.5,cas:3.0,casT:0.5,casX:0.5,toe:0.10,toeT:0.10,rcam:0.0,rcamT:0.5,rtoe:0.0,rtoeT:0.15},
     rearAdjustable:false,
     note:"Specs prefilled from real ’98–’00 S-series 2WD alignment printouts — verify against your spec sheet. Rear is a solid axle: rear rows are measure-only (a fail there means bent parts, not adjustment).",
@@ -749,7 +765,7 @@ const PROFILES={
     advToe:"Tie-rod adjuster sleeves, one per side. Loosen both clamp bolts and rotate the sleeve — lengthening a tie rod pushes that wheel toward toe-in. Adjust both sides to equal halves of the total (see the centering card). Point clamp openings down when re-tightening. Rear: not adjustable (solid axle)."
   },
   cayenne:{
-    name:"Porsche Cayenne", short:"Cayenne", tire:29.0,
+    name:"Porsche Cayenne", short:"Cayenne", tire:29.0, track:65.0,
     spec:{cam:-0.2,camT:0.3,camX:0.3,cas:8.3,casT:0.5,casX:0.5,toe:0.10,toeT:0.08,rcam:-1.33,rcamT:0.33,rtoe:0.33,rtoeT:0.17},
     rearAdjustable:true,
     note:"Typical 955/957-era numbers (rear camber −1°00′…−1°40′, rear toe +5′…+15′ per wheel) — edit to your model year’s sheet. Rear camber AND rear toe are genuinely adjustable on all Cayennes.",
@@ -758,7 +774,7 @@ const PROFILES={
     advToe:"Front: tie-rod ends with jam nuts (rotate the inner rod). Rear: <b>eccentric on each rear toe control link</b> — small marks on the washer, tiny turns, re-measure. Rear toe-in spec is real toe-in (≈+0.17° per wheel); set rear first, then front, steering wheel strapped centered."
   },
   highlander:{
-    name:"Toyota Highlander", short:"Highlander", tire:29.6,
+    name:"Toyota Highlander", short:"Highlander", tire:29.6, track:64.0,
     spec:{cam:0.0,camT:0.5,camX:0.5,cas:2.9,casT:0.75,casX:0.5,toe:0.06,toeT:0.12,rcam:-1.05,rcamT:0.75,rtoe:0.24,rtoeT:0.16},
     rearAdjustable:true,
     note:"Typical values (rear toe 0.04–0.20° range, rear camber −1.8…−0.3°) — edit to your model year. Rear toe is adjustable; rear camber is NOT adjustable on most stock years (aftermarket arms exist).",
@@ -767,7 +783,7 @@ const PROFILES={
     advToe:"Front: tie-rod ends with jam nuts. Rear: <b>toe-adjust cam bolt on each rear lower arm</b> — small turns (a full turn moves it a lot), re-measure every step. Set rear toe first, then front, steering wheel strapped centered."
   },
   custom:{
-    name:"Custom vehicle", short:"Custom", tire:28.0,
+    name:"Custom vehicle", short:"Custom", tire:28.0, track:60.0,
     spec:{cam:0.0,camT:0.5,camX:0.5,cas:3.0,casT:1.0,casX:0.5,toe:0.10,toeT:0.15,rcam:-0.5,rcamT:0.75,rtoe:0.15,rtoeT:0.15},
     rearAdjustable:true,
     note:"Blank slate — type in the spec-sheet numbers for whatever you’re working on.",
@@ -787,16 +803,33 @@ const S={
   rollZero:store.get("rollZero",0),     // plumb-axis offset, zeroed against a trusted external level
   levelZero:store.get("levelZero",0),   // level-axis offset, same idea for the horizontal hold
   specs:store.get("specs",{}),          // per-vehicle overrides
-  floors:store.get("floors",{}),        // per-vehicle {front:{slope,when}, rear:{...}}
+  floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,slopes,segs}, rear:{...}}
+  barLen:store.get("barLen",48),        // length of the straightedge, inches — sets how many placements a floor walk needs
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
   past:store.get("past",[])
 };
+/* Sessions captured before multi-placement averaging stored a single number
+   per wheel. Fold each one into a one-sample set on load so the n=/spread
+   readouts and the report show a real "n=1", not undefined, and so the next
+   tap appends to it instead of throwing it away. */
+function migrateSess(){
+  let ch=false;
+  for(const w in S.sess.cam){const m=S.sess.cam[w];
+    if(m&&!m.samples&&m.raw!=null){const v=camStat([m.raw]);v.when=m.when||v.when;S.sess.cam[w]=v;ch=true;}}
+  for(const w in S.sess.cas){const m=S.sess.cas[w];
+    if(m&&!m.sweeps&&m.caster!=null){const v=casStat([{caster:m.caster,sai:m.sai,thL:m.thL,thR:m.thR,c0:m.c0}]);v.when=m.when||v.when;S.sess.cas[w]=v;ch=true;}}
+  if(ch)saveSess();
+}
 function blankSess(){return{started:Date.now(),veh:S.veh,cam:{},cas:{},toeF:null,toeR:null,toeLF:null,toeRF:null,toeMethod:null,frameCenterline:null,frameVsThrust:null,railStraightL:null,railStraightR:null};}
 if(!S.sess)S.sess=blankSess();
 function saveSess(){store.set("sess2",S.sess);}
 function prof(){return PROFILES[S.veh]||PROFILES.custom;}
-function spec(){ if(!S.specs[S.veh])S.specs[S.veh]={...prof().spec,tire:prof().tire}; return S.specs[S.veh]; }
+function spec(){ if(!S.specs[S.veh])S.specs[S.veh]={...prof().spec,tire:prof().tire,track:prof().track}; return S.specs[S.veh]; }
+function trackIn(){return spec().track||prof().track||55.5;}
+function barIn(){return Math.max(6,S.barLen||48);}
+// shim thickness under the low-side tires that would cancel a roll of r degrees
+function shimFor(r){return Math.abs(Math.tan(R(r))*trackIn());}
 function saveSpecs(){store.set("specs",S.specs);}
 function floorSlope(axle){const f=S.floors[S.veh];return f&&f[axle]?f[axle].slope:0;}
 
@@ -1168,38 +1201,132 @@ async function zeroCapture(step,countdown){
 }
 function zeroUI(){for(let i=1;i<=3;i++){const el=$("zstep"+i);el.classList.toggle("done",zeroFlow.step>i||zeroFlow.step===4);el.classList.toggle("now",zeroFlow.step===i);}}
 
-/* ---------- floor flow ---------- */
-let floorBusy=false;
+/* ---------- floor flow ----------
+
+   What the camber gauge sees is the roll of the VEHICLE, and a vehicle
+   sitting on four tires rolls by the height difference between its two
+   contact patches divided by the track — the straight chord from tire to
+   tire. It does not care what the concrete does in between, and it does not
+   care about the local surface tilt directly under a tire either: a wheel
+   cannot roll independently of the axle it is bolted to, so there is no such
+   thing as a per-wheel floor slope to correct for.
+
+   The old version measured surface tilt at one spot somewhere near the axle
+   and used that as the chord. On a floor that is a clean plane the two are
+   the same number. On a floor that dishes, crowns, or carries a trowel wave
+   — i.e. a real garage slab — they are not, which is exactly the "it reads
+   different depending on where I measure it" problem.
+
+   So: walk the bar along the tire-to-tire line and integrate. A placement of
+   length L contributes rise L·sinθ, and the chord slope is
+   asin(Σ Lᵢ·sinθᵢ / track). Placements butt end to end; the last one is
+   positioned to finish ON the far contact patch, so it overlaps its
+   predecessor instead of overshooting past the tire (using a longer
+   segment's slope for the shorter remainder it contains is the right
+   approximation — overshooting would average in floor the truck isn't on).
+   The bar's own zero bias is cancelled once, by the 180° spin pair at
+   placement 1 — floorFrom already separates slope from bias — and then
+   subtracted from every later single capture. Same accuracy as spinning at
+   every station, for one spin instead of N.
+
+   Sign convention is unchanged and must stay that way: the phone's top
+   points at the PASSENGER side for every forward capture, so a positive
+   result still means passenger side low, which is what camberCorrection()
+   expects (+slope on left wheels, −slope on right).                       */
+let floorBusy=false, floorStop=false;
+function floorPlan(){
+  const L=barIn(), T=Math.max(20,trackIn());
+  const N=Math.max(1,Math.ceil(T/L-1e-9));
+  const segs=[];
+  for(let i=1;i<=N;i++)segs.push(i<N?L:+(T-(N-1)*L).toFixed(2));
+  return{L,T,N,segs};
+}
+function floorStepsUI(active=0){
+  const{N,segs}=floorPlan();
+  let h="";
+  for(let i=1;i<=N;i++){
+    let t;
+    if(i===1)t=(N===1)
+      ?"Lay the bar <b>flat on the floor across the vehicle</b>, one end on the <b>driver</b> tire’s contact patch and the other reaching the <b>passenger</b> tire, <b>top of phone toward the passenger side</b>. Hold still — then spin it <b>180°</b> in place and hold again."
+      :"Lay the bar <b>flat on the floor along the tire-to-tire line</b>, near end on the <b>driver</b> tire’s contact patch, <b>top of phone toward the passenger side</b>. Hold still — then spin it <b>180°</b> in place and hold again. That pair cancels the bar’s own bias once, for the whole walk.";
+    else if(i<N)t="Slide the bar <b>one full length</b> toward the passenger side — near end where the far end just was. Top of phone still toward the passenger side. Hold still.";
+    else t="Last one: put the bar’s <b>far end right on the passenger tire’s contact patch</b>. It will overlap the previous placement — that’s intended, not a mistake. Hold still.";
+    h+='<div class="step'+(i===active?" now":"")+'" id="fstep'+i+'"><div class="stepn">'+i+'</div><div class="stept">'+t+' <span class="small">· counts as '+segs[i-1]+'″ of the span</span></div></div>';
+  }
+  $("floorSteps").innerHTML=h;
+}
+function waitSteadyOrStop(preMs){
+  return new Promise((res,rej)=>{const iv=setInterval(()=>{
+    if(floorStop){clearInterval(iv);rej(new Error("stopped"));}
+    else if(isSteady(preMs)){clearInterval(iv);res(true);}
+  },100);});
+}
 async function floorRun(axle){
   if(!sensor.on){toast("Enable sensors first");return;}
-  if(floorBusy)return; floorBusy=true;
+  if(floorBusy)return; floorBusy=true; floorStop=false;
+  const LBL=axle==="front"?"FRONT":"REAR";
   try{
-    $("fstep1").classList.add("now");
-    $("floorState").textContent=(axle==="front"?"FRONT":"REAR")+" axle: bar flat on the floor, phone top toward PASSENGER side — hold still…";
-    await waitSteady(800);
-    const a=await sample(1200);flash();beep(1200,0.1);
-    $("fstep1").classList.remove("now");$("fstep1").classList.add("done");$("fstep2").classList.add("now");
-    $("floorState").textContent="Now spin the bar 180° in place (top toward DRIVER side) — hold still…";
-    await new Promise(r=>setTimeout(r,2000));
-    await waitSteady(800);
-    const b=await sample(1200);flash();beep(1320,0.12);
-    $("fstep2").classList.remove("now");$("fstep2").classList.add("done");
-    const res=floorFrom(tiltY(a.g),tiltY(b.g));
+    const{T,N,segs}=floorPlan();
+    const slopes=[];let bias=0;
+    for(let i=1;i<=N;i++){
+      floorStepsUI(i);
+      if(i===1){
+        $("floorState").textContent=LBL+" axle · placement 1 of "+N+": bar flat on the floor at the DRIVER tire, top of phone toward the PASSENGER side — hold still…";
+        await waitSteadyOrStop(800);
+        const a=await sample(1200);flash();beep(1200,0.1);
+        $("floorState").textContent=LBL+" axle · now spin the bar 180° in place (top toward the DRIVER side) — hold still…";
+        await new Promise(r=>setTimeout(r,2000));
+        await waitSteadyOrStop(800);
+        const b=await sample(1200);flash();beep(1320,0.12);
+        const f=floorFrom(tiltY(a.g),tiltY(b.g));
+        bias=f.bias;slopes.push(f.slope);
+      }else{
+        $("floorState").textContent=LBL+" axle · placement "+i+" of "+N+": "+(i<N?"slide the bar one full length toward the passenger side":"far end on the PASSENGER tire’s contact patch")+", top of phone toward the PASSENGER side — hold still…";
+        await new Promise(r=>setTimeout(r,2000));
+        await waitSteadyOrStop(800);
+        const c=await sample(1200);flash();beep(i<N?1200:1320,0.1);
+        slopes.push(tiltY(c.g)-bias);
+      }
+      const el=$("fstep"+i);if(el){el.classList.remove("now");el.classList.add("done");}
+    }
+    const slope=floorChord(segs,slopes,T);
     if(!S.floors[S.veh])S.floors[S.veh]={};
-    S.floors[S.veh][axle]={slope:res.slope,when:Date.now()};store.set("floors",S.floors);
-    floorStateUI();
-    setChip("chipFloor",true);
-    toast((axle==="front"?"Front":"Rear")+" floor slope "+fmt(res.slope)+"° stored");
-  }finally{floorBusy=false;}
+    S.floors[S.veh][axle]={slope,when:Date.now(),slopes,segs:segs.slice(),bias,track:T,barLen:barIn()};
+    store.set("floors",S.floors);
+    floorStateUI();setChip("chipFloor",true);
+    camUI();renderResults();
+    toast((axle==="front"?"Front":"Rear")+" floor "+fmt(slope)+"° across "+T+"″ ("+N+" placement"+(N>1?"s":"")+")");
+  }catch(e){
+    $("floorState").textContent="Walk stopped — nothing stored. Start it again when you’re ready.";
+  }finally{floorBusy=false;floorStop=false;}
 }
 function floorZeroOut(){
+  if(floorBusy)return;
   S.floors[S.veh]={front:{slope:0,when:Date.now()},rear:{slope:0,when:Date.now()}};
-  store.set("floors",S.floors);floorStateUI();setChip("chipFloor",true);
+  store.set("floors",S.floors);floorStateUI();setChip("chipFloor",true);camUI();renderResults();
 }
 function floorStateUI(){
   const f=S.floors[S.veh]||{};
-  const bit=a=>f[a]?fmt(f[a].slope)+"° ("+(f[a].slope>0?"passenger":f[a].slope<0?"driver":"neither")+" low)":"not measured";
-  $("floorState").innerHTML="Front axle: <b>"+bit("front")+"</b> · Rear axle: <b>"+bit("rear")+"</b>";
+  const bit=a=>{
+    const m=f[a];
+    if(!m)return "<b>not measured</b>";
+    let t="<b>"+fmt(m.slope)+"° ("+(m.slope>0?"passenger":m.slope<0?"driver":"neither")+" low)</b>";
+    if(m.slopes&&m.slopes.length>1){
+      const lo=Math.min.apply(null,m.slopes),hi=Math.max.apply(null,m.slopes);
+      t+=' <span class="small">· '+m.slopes.length+" placements, local slope ran "+fmt(lo)+"…"+fmt(hi)+"°"+
+         (hi-lo>0.3?" — that spread is why one spot wasn’t enough":"")+"</span>";
+    }
+    return t;
+  };
+  $("floorState").innerHTML="Front axle: "+bit("front")+"<br>Rear axle: "+bit("rear");
+  const sh=[];
+  for(const a of["front","rear"]){
+    const m=f[a];
+    if(m&&Math.abs(m.slope)>0.05)sh.push(a+": <b>"+shimFor(m.slope).toFixed(2)+"″</b> under the "+(m.slope>0?"passenger":"driver")+"-side tires");
+  }
+  $("floorShim").innerHTML=sh.length
+    ? "Or shim it level instead of correcting for it — "+sh.join(" · ")+". Worth doing past about 1°: the correction cancels the lean, but the lean also puts the suspension at different travel side to side, which changes camber for real. No arithmetic here can undo that; a shim can."
+    : "";
   setChip("chipFloor",(f.front||f.rear)?true:null);
 }
 
@@ -1210,6 +1337,29 @@ function camberCorrection(w){
 }
 function liveCamber(side){return (S.camSign[side]||1)*(tiltZ(sensor.g)-(S.zero?S.zero.off:0));}
 let camSide="LF";
+/* Multi-placement averaging. With the phone hand-held against the bar (no
+   hard mount), the dominant camber error is not sensor noise inside one
+   capture — sample() already averages ~80 readings — it is how differently
+   the phone sits on the bar each time you place it. That scatter is
+   invisible to a single capture, which is why one reading can look precise
+   and still be wrong. So each tap adds ONE placement, and the tile shows
+   the mean, the spread between placements (1σ), and the standard error of
+   the mean (σ/√n). Lift the phone off and re-seat it between taps —
+   re-capturing without re-placing measures nothing new.
+   Why it matters most for caster: caster = Δcamber/(sinθL−sinθR), so at a
+   ±15° sweep the two camber readings get multiplied by 1/0.518 ≈ 1.93.
+   A 0.20° placement scatter becomes 0.20·√2·1.93 ≈ 0.55° of caster — over
+   the ±0.5° spec on a single placement. Four placements halve it. */
+function camStat(samples){
+  const n=samples.length;
+  const mean=samples.reduce((a,b)=>a+b,0)/n;
+  const sd=n>1?Math.sqrt(samples.reduce((a,v)=>a+(v-mean)**2,0)/(n-1)):null;
+  return{samples,n,raw:mean,sd,se:(sd!=null?sd/Math.sqrt(n):null),when:Date.now()};
+}
+// Always recomputed from raw + the CURRENT roll correction, so changing the
+// roll number later re-grades existing captures instead of leaving stale
+// values baked in at capture time.
+function camVal(w){const m=S.sess.cam[w];return m?m.raw+camberCorrection(w):null;}
 async function camCapture(w){
   if(!sensor.on){toast("Enable sensors first");return;}
   camSide=w;
@@ -1219,18 +1369,24 @@ async function camCapture(w){
     if(!ok){toast("Too shaky — brace the bar against the wheel and try again");return;}
   }
   const s=await sample(1300);
-  const raw=(S.camSign[w]||1)*(tiltZ(s.g)-(S.zero?S.zero.off:0));
-  const corr=camberCorrection(w);
-  S.sess.cam[w]={raw,corrected:raw+corr,when:Date.now()};saveSess();
+  const one=(S.camSign[w]||1)*(tiltZ(s.g)-(S.zero?S.zero.off:0));
+  const prev=S.sess.cam[w];
+  const samples=(prev&&prev.samples)?prev.samples.concat([one]):[one];
+  S.sess.cam[w]=camStat(samples);saveSess();
   flash();beep(1250,0.1);
   camUI();renderResults();
-  toast(`${w} camber ${fmt(raw+corr)}°`);
+  const m=S.sess.cam[w];
+  toast(`${w} ${fmt(camVal(w))}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat and add another"));
 }
+function camClear(w){delete S.sess.cam[w];saveSess();camUI();renderResults();toast(w+" cleared");}
 function camUI(){
   for(const w of["LF","RF","LR","RR"]){
     const m=S.sess.cam[w];
-    $("cam"+w+"v").textContent=m?fmt(m.corrected)+"°":"–";
-    $("cam"+w+"s").textContent=m?("raw "+fmt(m.raw)+"° · floor "+fmt(camberCorrection(w))+"°"):"";
+    $("cam"+w+"v").textContent=m?fmt(camVal(w))+"°":"–";
+    if(!m){$("cam"+w+"s").textContent="";continue;}
+    const q=m.sd==null?"add 2 more":(m.sd<0.15?"good":m.sd<0.35?"fair":"sloppy — re-seat carefully");
+    $("cam"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+
+      " · "+q+"<br>roll corr "+fmt(camberCorrection(w))+"°";
   }
 }
 function camSignFix(side){
@@ -1268,21 +1424,51 @@ async function casterGrab(which){
   else{cas.thR=th;cas.cR=camb;cas.phase=4;flash();beep(1320,0.15);finishCaster();}
   casUI();
 }
+/* Multi-sweep averaging — same reasoning as camber, but with more at stake.
+   caster = Δcamber/(sinθL−sinθR). At a ±15° sweep that denominator is
+   0.518, so every camber reading taken during the sweep — and every bit of
+   hand-held placement scatter riding along with it — comes out multiplied
+   by 1/0.518 ≈ 1.93. A 0.20° placement spread becomes 0.20·√2·1.93 ≈ 0.55°
+   of caster: already outside the ±0.5° spec, from a single sweep that felt
+   rock steady the whole way. One sweep cannot show you that error, because
+   nothing inside it disagrees with anything else.
+   The only defence is repetition with a genuine re-placement between tries:
+   lift the phone off the bar, re-seat it, sweep again. Each sweep appends to
+   the wheel instead of replacing it, and the tile reports the mean, the
+   spread between sweeps (1σ) and the standard error of that mean (σ/√n).
+   Sweeping again without re-seating the phone measures nothing new. */
+function casStat(sweeps){
+  const n=sweeps.length;
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const cs=sweeps.map(x=>x.caster);
+  const caster=avg(cs);
+  const sd=n>1?Math.sqrt(cs.reduce((a,v)=>a+(v-caster)**2,0)/(n-1)):null;
+  const sa=sweeps.map(x=>x.sai).filter(v=>v!=null);
+  return{sweeps,n,caster,sd,se:(sd!=null?sd/Math.sqrt(n):null),sai:sa.length?avg(sa):null,when:Date.now()};
+}
 function finishCaster(){
   cas.run=false;sensor.yawRun=false;
   const r=casterFrom(cas.thL,cas.cL,cas.thR,cas.cR,cas.c0);
   if(!r){toast("Sweep too small — try again with a bigger swing");cas.phase=0;casUI();return;}
-  S.sess.cas[cas.wheel]={caster:r.caster,sai:r.sai,thL:cas.thL,thR:cas.thR,c0:cas.c0,when:Date.now()};saveSess();
+  const prev=S.sess.cas[cas.wheel];
+  const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([{caster:r.caster,sai:r.sai,thL:cas.thL,thR:cas.thR,c0:cas.c0}]);
+  S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
   $("casMode").textContent="Caster sweep";
   casUI();renderResults();
-  toast(cas.wheel+" caster "+fmt(r.caster)+"°");
+  const m=S.sess.cas[cas.wheel];
+  toast(`${cas.wheel} caster ${fmt(m.caster)}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat the phone and sweep again"));
 }
+function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
 function casUI(){
   for(let i=1;i<=3;i++){const el=$("cstep"+i);el.classList.toggle("done",cas.phase>i);el.classList.toggle("now",cas.phase===i);}
   for(const w of["LF","RF"]){
     const m=S.sess.cas[w];
     $("cas"+w+"v").textContent=m?fmt(m.caster,2)+"°":"–";
-    $("cas"+w+"s").textContent=m?("swing "+fmt(m.thL,1)+"/"+fmt(m.thR,1)+"° · SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–")):"";
+    if(!m){$("cas"+w+"s").textContent="";continue;}
+    const last=(m.sweeps&&m.sweeps.length)?m.sweeps[m.sweeps.length-1]:null;
+    const q=m.sd==null?"sweep again":(m.sd<0.25?"good":m.sd<0.6?"fair":"scattered — re-seat and repeat");
+    $("cas"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+" · "+q+
+      "<br>"+(last?"last swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
   }
 }
 
@@ -1431,13 +1617,18 @@ function renderResults(){
   const body=$("resTable").querySelector("tbody");
   const row=(name,lf,rf,specTxt,v)=>`<tr><td>${name}</td><td class="num">${lf}</td><td class="num">${rf}</td><td class="num">${specTxt}</td><td>${v}</td></tr>`;
   const pill=v=>`<span class="pill ${v.cls}">${v.txt}</span>`;
+  /* Repeat captures are only worth taking if the answer says how well they
+     agreed, so every averaged cell carries the standard error of its mean.
+     Read it as: another set of placements would most likely land within
+     this much. A PASS with a ±0.40 next to it is not a pass. */
+  const cell=(v,m)=>v==null?"–":fmt(v)+"°"+((m&&m.se!=null)?` <span class="small">±${m.se.toFixed(2)}</span>`:"");
   let html="";
-  const camLF=c.LF?c.LF.corrected:null,camRF=c.RF?c.RF.corrected:null;
+  const camLF=camVal("LF"),camRF=camVal("RF");
   const vCamL=verdict(camLF,sp.cam,sp.camT),vCamR=verdict(camRF,sp.cam,sp.camT);
-  html+=row("F camber",camLF!=null?fmt(camLF)+"°":"–",camRF!=null?fmt(camRF)+"°":"–",fmt(sp.cam)+" ±"+sp.camT,pill(vCamL)+" "+pill(vCamR));
+  html+=row("F camber",cell(camLF,c.LF),cell(camRF,c.RF),fmt(sp.cam)+" ±"+sp.camT,pill(vCamL)+" "+pill(vCamR));
   const casLF=k.LF?k.LF.caster:null,casRF=k.RF?k.RF.caster:null;
   const vCasL=verdict(casLF,sp.cas,sp.casT),vCasR=verdict(casRF,sp.cas,sp.casT);
-  html+=row("F caster",casLF!=null?fmt(casLF)+"°":"–",casRF!=null?fmt(casRF)+"°":"–",fmt(sp.cas)+" ±"+sp.casT,pill(vCasL)+" "+pill(vCasR));
+  html+=row("F caster",cell(casLF,k.LF),cell(casRF,k.RF),fmt(sp.cas)+" ±"+sp.casT,pill(vCasL)+" "+pill(vCasR));
   const xCam=(camLF!=null&&camRF!=null)?camLF-camRF:null;
   const xCas=(casLF!=null&&casRF!=null)?casLF-casRF:null;
   html+=row("F cross (L−R)",xCam!=null?fmt(xCam)+"°":"–",xCas!=null?fmt(xCas)+"°":"–","≤ "+sp.camX+" / "+sp.casX,
@@ -1450,10 +1641,10 @@ function renderResults(){
     const vL=verdict(S.sess.toeLF,half,halfT),vR=verdict(S.sess.toeRF,half,halfT);
     html+=row("F toe vs thrust",fmt(S.sess.toeLF)+"°",fmt(S.sess.toeRF)+"°","each "+fmt(half)+" ±"+halfT.toFixed(2),pill(vL)+" "+pill(vR));
   }
-  const camLR=c.LR?c.LR.corrected:null,camRR=c.RR?c.RR.corrected:null;
+  const camLR=camVal("LR"),camRR=camVal("RR");
   const refOnly=!p.rearAdjustable&&S.veh==="sonoma";
   const vRcL=verdict(camLR,sp.rcam,sp.rcamT),vRcR=verdict(camRR,sp.rcam,sp.rcamT);
-  html+=row("R camber"+(refOnly?" (check)":""),camLR!=null?fmt(camLR)+"°":"–",camRR!=null?fmt(camRR)+"°":"–",fmt(sp.rcam)+" ±"+sp.rcamT,pill(vRcL)+" "+pill(vRcR));
+  html+=row("R camber"+(refOnly?" (check)":""),cell(camLR,c.LR),cell(camRR,c.RR),fmt(sp.rcam)+" ±"+sp.rcamT,pill(vRcL)+" "+pill(vRcR));
   const vRt=verdict(S.sess.toeR,sp.rtoe,sp.rtoeT);
   html+=row("R total toe"+(refOnly?" (check)":""),S.sess.toeR!=null?fmt(S.sess.toeR)+"°":"–","",fmt(sp.rtoe)+" ±"+sp.rtoeT,pill(vRt));
   body.innerHTML=html;
@@ -1489,13 +1680,16 @@ function reportText(){
   L.push("SONOMA ALIGN — "+new Date().toLocaleString());
   L.push(prof().name);
   const fl=S.floors[S.veh]||{};
-  L.push("floor F "+(fl.front?fmt(fl.front.slope)+"°":"n/a")+" R "+(fl.rear?fmt(fl.rear.slope)+"°":"n/a")+" · gauge zero "+(S.zero?fmt(S.zero.off)+"°":"n/a"));
+  const flBit=m=>m?fmt(m.slope)+"°"+(m.slopes&&m.slopes.length>1?" ("+m.slopes.length+" placements)":""):"n/a";
+  L.push("floor F "+flBit(fl.front)+" R "+flBit(fl.rear)+" · gauge zero "+(S.zero?fmt(S.zero.off)+"°":"n/a"));
   L.push("");
-  L.push("F camber  LF "+(c.LF?fmt(c.LF.corrected)+"°":"–")+"  RF "+(c.RF?fmt(c.RF.corrected)+"°":"–")+"  (spec "+fmt(sp.cam)+" ±"+sp.camT+")");
-  L.push("F caster  LF "+(k.LF?fmt(k.LF.caster)+"°":"–")+"  RF "+(k.RF?fmt(k.RF.caster)+"°":"–")+"  (spec "+fmt(sp.cas)+" ±"+sp.casT+")");
+  const camBit=w=>{const m=c[w];return m?fmt(camVal(w))+"° (n="+(m.n||1)+(m.se!=null?", ±"+m.se.toFixed(2):"")+")":"–";};
+  L.push("F camber  LF "+camBit("LF")+"  RF "+camBit("RF")+"  (spec "+fmt(sp.cam)+" ±"+sp.camT+")");
+  const nBit=m=>m?" (n="+(m.n||1)+(m.se!=null?", ±"+m.se.toFixed(2):"")+")":"";
+  L.push("F caster  LF "+(k.LF?fmt(k.LF.caster)+"°"+nBit(k.LF):"–")+"  RF "+(k.RF?fmt(k.RF.caster)+"°"+nBit(k.RF):"–")+"  (spec "+fmt(sp.cas)+" ±"+sp.casT+")");
   L.push("F toe     "+(S.sess.toeF!=null?fmt(S.sess.toeF)+"° total ("+toeInches(S.sess.toeF)+"\" · "+(S.sess.toeMethod||"")+")":"–")+"  (spec "+fmt(sp.toe)+" ±"+sp.toeT+")");
   if(S.sess.toeLF!=null)L.push("F toe vs thrust  LF "+fmt(S.sess.toeLF)+"°  RF "+fmt(S.sess.toeRF)+"°");
-  L.push("R camber  LR "+(c.LR?fmt(c.LR.corrected)+"°":"–")+"  RR "+(c.RR?fmt(c.RR.corrected)+"°":"–")+"  (spec "+fmt(sp.rcam)+" ±"+sp.rcamT+")");
+  L.push("R camber  LR "+camBit("LR")+"  RR "+camBit("RR")+"  (spec "+fmt(sp.rcam)+" ±"+sp.rcamT+")");
   L.push("R toe     "+(S.sess.toeR!=null?fmt(S.sess.toeR)+"° total":"–")+"  (spec "+fmt(sp.rtoe)+" ±"+sp.rtoeT+")");
   if(S.sess.frameCenterline!=null)L.push("Frame centerline vs thrust  "+fmt(S.sess.frameVsThrust)+"°  (rail straightness L "+fmt(S.sess.railStraightL)+"° R "+fmt(S.sess.railStraightR)+"°)");
   return L.join("\n");
@@ -1530,7 +1724,9 @@ function vehApply(){
   $("advCamber").innerHTML=p.advCamber;
   $("advCaster").innerHTML=p.advCaster;
   $("advToe").innerHTML=p.advToe;
-  specLoad();floorStateUI();renderResults();
+  $("barLen").value=barIn();
+  $("trackW").value=trackIn();
+  specLoad();floorStepsUI(0);floorStateUI();renderResults();
 }
 function vehChange(v){
   if(S.sess&&S.sess.veh!==v&&(Object.keys(S.sess.cam).length||S.sess.toeF!=null)){archiveSession();S.sess=blankSess();}
@@ -1642,10 +1838,21 @@ $("btnZeroGo").addEventListener("click",zeroRun);
 $("btnZeroReset").addEventListener("click",()=>{S.zero=null;store.set("zero",null);zeroFlow.step=0;zeroUI();$("zeroState").textContent="No gauge zero stored.";setChip("chipZero",false);});
 $("btnFloorGo").addEventListener("click",()=>floorRun("front"));
 $("btnFloorGoR").addEventListener("click",()=>floorRun("rear"));
+$("btnFloorStop").addEventListener("click",()=>{if(floorBusy){floorStop=true;}else{floorStepsUI(0);}});
 $("btnFloorZeroOut").addEventListener("click",floorZeroOut);
+$("barLen").addEventListener("change",()=>{
+  S.barLen=Math.max(6,+$("barLen").value||48);store.set("barLen",S.barLen);
+  $("barLen").value=S.barLen;floorStepsUI(0);
+});
+$("trackW").addEventListener("change",()=>{
+  spec().track=Math.max(20,+$("trackW").value||55.5);saveSpecs();
+  $("trackW").value=trackIn();floorStepsUI(0);floorStateUI();camUI();renderResults();
+});
 document.querySelectorAll("[data-camcap]").forEach(b=>b.addEventListener("click",()=>camCapture(b.dataset.camcap)));
+document.querySelectorAll("[data-camclr]").forEach(b=>b.addEventListener("click",()=>camClear(b.dataset.camclr)));
 $("btnCamSignL").addEventListener("click",()=>camSignFix("L"));
 $("btnCamSignR").addEventListener("click",()=>camSignFix("R"));
+document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click",()=>casClear(b.dataset.casclr)));
 $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casterAbort);
@@ -1678,6 +1885,7 @@ if(S.zero){$("zeroState").innerHTML="Gauge zero stored ("+fmt(S.zero.off)+"°) f
 if(S.accelSign!==0&&S.gyroSign!==0)$("flatState").innerHTML="Flat check done earlier ✓ (redo any time).";
 if(S.rollZero||S.levelZero)$("levelZeroState").innerHTML="Stored: plumb "+fmt(S.rollZero)+"°, level "+fmt(S.levelZero)+"°.";
 $("sessState").textContent="Session started "+new Date(S.sess.started).toLocaleString();
+migrateSess();
 camUI();casUI();toeRender();renderResults();
 tick();
 if(typeof DeviceMotionEvent!=="undefined"&&typeof DeviceMotionEvent.requestPermission!=="function"){
