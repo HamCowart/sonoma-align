@@ -404,12 +404,14 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
           <option value="deg">Steer to ±15° — watching the phone</option>
         </select>
       </div>
+      <div class="note" style="margin-top:8px"><b>Tape the phone to the wheel sideways</b> — long axis pointing front-to-back, not up-and-down. The steer angle is read off the compass, and steering pivots the wheel about a near-vertical axis: mounted upright that axis runs straight through the phone’s own top, so the top keeps pointing at the sky and the compass has no horizontal direction to report. Turned sideways the top swings through the horizontal plane by exactly the steer angle. <b>Camber reads identically either way</b> — it only uses the tilt of the screen, which doesn’t change when you rotate the phone in its own plane — so the sideways mount is free. The app checks which way round it is and says so; <b>Check steer sensors</b> proves it on your phone in about thirty seconds.</div>
       <div class="note" style="margin-top:8px">Engine off, <b>brake held hard</b> the whole sweep — a helper or a board wedged from the seat to the pedal. Front tires on something slippery (two vinyl tiles with grease between, or a pair of plastic bags each) so they can pivot.</div>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn primary" id="btnCasL">Add LF sweep</button>
         <button class="btn primary" id="btnCasR">Add RF sweep</button>
         <button class="btn ghost" id="btnCasAbort">Stop</button>
         <button class="btn ghost" id="btnCasVoice">Voice: on</button>
+        <button class="btn ghost" id="btnCasSens">Check steer sensors</button>
       </div>
       <div class="steps" style="margin-top:10px">
         <div class="step" id="cstep1"><div class="stepn">1</div><div class="stept"></div></div>
@@ -794,12 +796,49 @@ function casterFrom(thL,cL,thR,cR,c0){
    Gyro stays as the fallback when there is no compass, and both numbers are
    recorded on every capture so a disagreement can be reported instead of
    averaged into the answer. */
+/* WHICH WAY THE PHONE IS TAPED ON, and why the compass cares.
+
+   The wheel face is near vertical, so the screen normal is near horizontal
+   and gravity lies almost entirely in the phone's own x-y plane. Whichever
+   of those two axes is carrying the gravity tells us the mount.
+
+   Steering turns the wheel about a NEAR-VERTICAL axis, so:
+
+     portrait (long axis vertical) -- that steering axis is essentially the
+       phone's own long axis. The phone spins about its own top, and the top
+       goes on pointing at the sky the whole sweep. A heading defined as
+       "the direction the top of the device points" then has no horizontal
+       direction to report at all: it is the degenerate case, and whatever
+       number comes out is not the steer angle.
+
+     landscape (long axis fore-aft and horizontal) -- the top of the device
+       is horizontal and sweeps through the horizontal plane by exactly the
+       steer angle, which is precisely what a compass heading measures.
+
+   So the caster sweep asks for LANDSCAPE, and it costs nothing to give:
+   camber is tiltZ() = asin(g[2]), the gravity along the screen normal,
+   which is completely unchanged by rotating the phone inside its own plane.
+   Turning the phone 90 degrees on the wheel moves the compass from useless
+   to exact and leaves the camber measurement identical. */
+function casMount(g){
+  const ax=Math.abs(g[0]),ay=Math.abs(g[1]);
+  if(Math.max(ax,ay)<0.5)return"flat";        // lying down, not on a wheel face
+  return ax>ay?"landscape":"portrait";
+}
+
 function casTheta(){
   const thG=sensor.yaw;
   let thC=null;
   if(sensor.hasCompass&&cas.acc0!=null)thC=-(sensor.compassAcc-cas.acc0);
-  const useC=thC!=null&&(sensor.compassAccuracy==null||sensor.compassAccuracy<=25);
-  return{th:useC?thC:thG,src:useC?"compass":"gyro",thG,thC};
+  // Three ways to disbelieve the compass, in order of how badly it lies:
+  const geomOk=cas.mount!=="portrait";        // degenerate geometry -- see above
+  const accOk=sensor.compassAccuracy==null||sensor.compassAccuracy<=25;
+  // ...and a compass sitting still while the gyro says the wheel plainly
+  // moved is the degeneracy showing itself whatever the mount looked like.
+  const alive=thC!=null&&!(Math.abs(thC)<3&&Math.abs(thG)>3);
+  const useC=thC!=null&&geomOk&&accOk&&alive;
+  return{th:useC?thC:thG,src:useC?"compass":"gyro",thG,thC,mount:cas.mount,
+         why:useC?null:(thC==null?"no compass":!geomOk?"portrait mount":!accOk?"compass unreliable":"compass not responding")};
 }
 
 function solve3(A,b){   // 3x3 Gauss-Jordan with partial pivoting
@@ -1118,6 +1157,15 @@ window.__align.rollError=rollError;window.__align.levelError=levelError;
 // accelerometer bias here would read a false few degrees even when
 // genuinely plumb, with no way to correct it. This closes that gap.
 const liveRollError=g=>rollError(g)-(S.rollZero||0);
+/* Caster's hold indicator has to watch whichever in-plane axis is SUPPOSED
+   to be horizontal, and that depends on how the phone is taped to the wheel
+   (see casMount). In landscape the roles of g[0] and g[1] swap, so reading
+   g[0] there would show a permanent 90-degree error on a perfectly held
+   phone. rollZero was calibrated against g[0] specifically, so it applies
+   only to the portrait hold; landscape reads the other axis uncorrected,
+   which is fine for what this is -- an advisory hold-consistency light with
+   deliberately generous thresholds, not an input to any measurement. */
+const casRollError=g=>casMount(g)==="landscape"?D(Math.asin(clamp(g[1],-1,1))):liveRollError(g);
 const liveLevelError=g=>levelError(g)-(S.levelZero||0);
 window.__align.liveRollError=liveRollError;window.__align.liveLevelError=liveLevelError;
 function waitSteady(preMs=800){return new Promise(r=>{const iv=setInterval(()=>{if(isSteady(preMs)){clearInterval(iv);r(true);}},100);});}
@@ -1574,7 +1622,7 @@ function camSignFix(side){
 
 /* ---------- caster sweep ---------- */
 const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false,_lastBeep:0,
-  pts:[],acc0:null,warned:false,src:null};
+  pts:[],acc0:null,warned:false,src:null,mount:null,test:false,testReport:null};
 const casCont=()=>S.sweepMode==="cont";
 const CAS_MIN=8;   // below this the sweep is too small for the divisor to be trustworthy
 async function casterStart(wheel){
@@ -1587,7 +1635,7 @@ async function casterStart(wheel){
   beep(900,0.05,0.2);
   keepAwake(true);
   cas.run=true;cas.wheel=wheel;cas.phase=1;cas.c0=cas.thL=cas.cL=cas.thR=cas.cR=null;
-  cas.pts=[];cas.acc0=null;cas.warned=false;cas.src=null;
+  cas.pts=[];cas.acc0=null;cas.warned=false;cas.src=null;cas.testReport=null;
   casUI();
   $("casMode").textContent="Caster sweep · "+wheel;
   toast("Wheels straight — hold the bar still on "+wheel);
@@ -1597,9 +1645,15 @@ async function casterStart(wheel){
   sensor.gyroBias=s0.rot;
   sensor.yaw=0;sensor.yawRun=true;
   cas.acc0=sensor.hasCompass?sensor.compassAcc:null;      // absolute steer-angle reference
+  cas.mount=casMount(s0.g);
   cas.c0=(S.camSign[cas.wheel]||1)*tiltZ(s0.g);
   cas.pts=[{th:0,camb:cas.c0,src:"centre"}];              // centre is a data point like any other
   cas.phase=2;casUI();flash();beep(1200,0.1);
+  if(cas.mount==="portrait"&&sensor.hasCompass){
+    // Worth interrupting for: it silently drops the sweep back onto the gyro.
+    toast("Phone is upright on the wheel — compass can't see the steer there. Re-tape it sideways (long axis fore-and-aft).");
+    say("Heads up. The phone is mounted upright. The compass cannot measure steering in that position, so I would be falling back to the gyro. Re-tape it sideways, long axis pointing front to back, and start again. Camber is unaffected either way.");
+  }
   if(!sensor.hasCompass&&S.gyroScale===1){
     // Nothing here can detect a rotationRate scale error, so say so up front.
     toast("No compass — steer angle is an uncalibrated gyro integral, caster may be badly scaled");
@@ -1619,6 +1673,7 @@ async function casterStart(wheel){
 function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;cas.pts=[];cas.acc0=null;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
 // The Stop button finishes a continuous run instead of throwing it away.
 function casStopBtn(){
+  if(cas.run&&cas.test){cas.test=false;casterAbort();toast("Sensor check stopped");return;}
   if(cas.run&&casCont()&&cas.pts.length>=4){finishCasterFit();return;}
   if(cas.run&&casCont()&&cas.pts.length>1){toast("Only "+(cas.pts.length-1)+" capture(s) — need 3 to solve, 4 to check itself");say("Not enough captures yet. Keep going.");return;}
   casterAbort();
@@ -1636,6 +1691,7 @@ function casCheckAgree(t){
   }
 }
 async function casterGrab(which){
+  if(cas.test){casSensorReport();return;}
   const s=await sample(1100);
   const camb=(S.camSign[cas.wheel]||1)*tiltZ(s.g);
   const t=casTheta();
@@ -1714,7 +1770,7 @@ function finishCasterFit(){
                nCap:r.n,rms:r.rms,fitSe:r.se,src:cas.src,pts:cas.pts.slice()};
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
-  cas.pts=[];cas.acc0=null;          // run is stored; the log now reads it back from there
+  cas.pts=[];cas.acc0=null;cas.testReport=null;   // run is stored; the log reads it back from there
   cas.phase=4;casUI();renderResults();
   const bad=r.rms>0.40;   // see lsqCaster: healthy runs sit near 0.16, p90 0.22
   toast(`${cas.wheel} caster ${fmt(r.caster)}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
@@ -1736,10 +1792,61 @@ function finishCaster(){
   toast(`${cas.wheel} caster ${fmt(m.caster)}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat the phone and sweep again"));
   say("Caster "+m.caster.toFixed(1)+" degrees"+(m.sd!=null?", spread "+m.sd.toFixed(2):"")+". "+(m.n<3?"Re-seat the phone and sweep again.":""));
 }
+/* Steer-sensor self-test. Only James has an iPhone, so rather than assert
+   from here how webkitCompassHeading behaves with the phone stuck to a
+   wheel, this steers once and prints what each sensor actually saw. Thirty
+   seconds on the truck settles it empirically, and it stores nothing. */
+function casSensorStart(){
+  if(!sensor.on){toast("Enable sensors first");return;}
+  say("Sensor check. Hold the bar still.");
+  beep(900,0.05,0.2);
+  cas.run=true;cas.test=true;cas.wheel="LF";cas.phase=1;cas.pts=[];cas.warned=true;
+  casUI();$("casMode").textContent="Steer-sensor check";
+  waitSteady(900).then(async()=>{
+    if(!cas.run)return;
+    const s0=await sample(1200);
+    sensor.gyroBias=s0.rot;sensor.yaw=0;sensor.yawRun=true;
+    cas.acc0=sensor.hasCompass?sensor.compassAcc:null;
+    cas.mount=casMount(s0.g);
+    cas.phase=2;casUI();flash();beep(1200,0.1);
+    const m=cas.mount==="landscape"?"sideways, good for the compass"
+           :cas.mount==="portrait"?"upright — the compass cannot see steering like this"
+           :"lying flat, not on a wheel face";
+    toast("Mounted "+cas.mount+" · "+m+" — now steer one way and hold");
+    say("Phone is mounted "+cas.mount+". "+m+". Now steer one way as far as you like and hold it.");
+  });
+}
+function casSensorReport(){
+  cas.run=false;cas.test=false;sensor.yawRun=false;keepAwake(false);cas.phase=0;
+  $("casMode").textContent="Caster sweep";
+  const t=casTheta();
+  const cT=t.thC==null?"none":fmt(t.thC,1)+"°";
+  const gT=fmt(t.thG,1)+"°";
+  const lines=[
+    "STEER-SENSOR CHECK",
+    "",
+    "mount      : "+(cas.mount||"?"),
+    "compass    : "+cT+(sensor.compassAccuracy!=null?"  (accuracy ±"+sensor.compassAccuracy.toFixed(0)+"°)":""),
+    "gyro       : "+gT+"   (scale "+S.gyroScale.toFixed(2)+"x)",
+    "would use  : "+t.src+(t.why?"   because "+t.why:""),
+    "",
+    "If you steered to a stop, the trustworthy number should read",
+    "roughly 30-40 degrees. Whichever sensor shows that is the one",
+    "telling the truth. If the gyro is the one that is close and the",
+    "compass is not, say so and the sweep can be pinned to the gyro."
+  ];
+  cas.testReport=lines.join(String.fromCharCode(10));
+  casUI();   // casLogUI renders cas.testReport, so set it before, not after
+  toast("Compass "+cT+" · gyro "+gT+" · would use "+t.src);
+  say("Compass saw "+(t.thC==null?"nothing":Math.round(Math.abs(t.thC))+" degrees")+
+      ". Gyro saw "+Math.round(Math.abs(t.thG))+" degrees. I would use the "+t.src+
+      ". Open captures from the last run to read the details.");
+}
 function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
 // The raw captures, so a suspect result can be read back instead of guessed at.
 function casLogUI(){
   const el=$("casLog");if(!el)return;
+  if(cas.testReport){el.textContent=cas.testReport;return;}
   let pts=cas.pts&&cas.pts.length>1?cas.pts:null,head="in progress";
   if(!pts){
     for(const w of["LF","RF"]){
@@ -2103,7 +2210,7 @@ function tick(){
   }
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
-    setOrient("orientCas","orientCasTxt",liveRollError(sensor.g),"plumb");
+    setOrient("orientCas","orientCasTxt",casRollError(sensor.g),"plumb");
     if(cas.run&&cas.phase>=2){
       const tAng=casTheta();
       const psi=tAng.th;
@@ -2116,7 +2223,11 @@ function tick(){
       const lastPt=cas.pts.length>1?cas.pts[cas.pts.length-1]:null;
       const dir=casCont()?((lastPt&&lastPt.th>0)?-1:1):(cas.phase===2?1:-1);
       const held=sensor.stillSince?performance.now()-sensor.stillSince:0;
-      const far=Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN;
+      // The self-test must trip whichever way he steers, and must not depend
+      // on the very sensor it is there to check -- either one moving counts.
+      const far=cas.test
+        ? (Math.abs(tAng.thG)>=CAS_MIN||(tAng.thC!=null&&Math.abs(tAng.thC)>=CAS_MIN))
+        : (Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN);
       const grab=()=>{cas._busy=true;casterGrab(dir>0?"L":"R").finally(()=>cas._busy=false);};
       if(S.sweepMode==="deg"){
         const tgt=dir*cas.target;
@@ -2130,7 +2241,8 @@ function tick(){
         // No target to hit: he steers to the mechanical stop and holds, and
         // whatever angle that turns out to be is the angle the maths uses.
         const nCap=cas.pts.length-1;
-        $("roCasB").textContent=far?"far enough — stop and hold"
+        $("roCasB").textContent=cas.test?(far?"got it — hold still":"steer either way and hold")
+          :far?"far enough — stop and hold"
           :(casCont()?(nCap+" captured · steer "+(dir>0?"LEFT":"RIGHT")):"steer "+(dir>0?"LEFT":"RIGHT")+" to the stop");
         drawBubble($("bubCas"),psi,{span:45});
         if(!cas._busy&&far&&held>1800)grab();
@@ -2204,6 +2316,7 @@ document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click"
 $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casStopBtn);
+$("btnCasSens").addEventListener("click",casSensorStart);
 $("sweepMode").value=S.sweepMode;
 $("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();});
 casStepsUI();
