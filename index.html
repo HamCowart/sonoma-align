@@ -389,14 +389,18 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <h2>Steering sweep</h2>
-      <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing with its gyro and grabs camber at each end by itself.</p>
+      <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing and grabs camber by itself each time you hold still.</p>
+      <p class="hint"><b>Keep sweeping until you press Stop, and vary how far you turn.</b> Every hold is another data point, and the app fits caster and SAI to all of them at once. Eight captures cut the scatter to about 0.15° where a single lock-to-lock pair gives 0.26°, and because there are then more readings than unknowns the fit also reports a <b>misfit</b> — how well the captures agree with each other. A single pair has no spare readings, so it fits perfectly no matter how wrong it is and can never warn you about anything.</p>
+      <p class="hint"><b>What misfit catches:</b> the bar shifting on the wheel, tape letting go, one fumbled capture. Under <b>0.22°</b> is healthy, over <b>0.40°</b> means something moved — re-tape and run it again. What it does <i>not</i> catch is a wrongly scaled steer angle: that error hides inside the fit almost perfectly, which is why the angle now comes from the compass instead of a learned gyro scale, and why a compass/gyro disagreement is announced out loud rather than left to the misfit to notice.</p>
+      <p class="hint"><b>Steer angle now comes from the compass, not the gyro.</b> Heading is absolute, so the angle is a difference between two readings instead of an integral — nothing to drift, no per-device scale factor to get wrong, and nothing lost if the phone’s motion events stall partway through a turn. If the compass and the gyro disagree, it says so out loud and uses the compass.</p>
       <p class="hint"><b>You don’t have to hit any particular angle, and you don’t have to look at anything.</b> Steer until the wheel stops, hold it there, and it captures — then tells you out loud what it got. The maths uses the angle you actually reached, whatever it was, so the steering stop makes a perfect reference: it’s the same place every single time and you can feel it.</p>
       <p class="hint"><b>Going to the stops is also more accurate than the old ±15°.</b> Caster comes from a camber difference divided by sinθL−sinθR. At ±15° that divisor is 0.518, so every bit of hand-placement scatter comes back <b>1.9× bigger</b>. At full lock, around ±35°, the divisor is about 1.15 — it <b>shrinks</b> the scatter to 0.87× instead. End to end that is a bit over <b>twice as steady</b> a number for the same sloppiness.</p>
       <p class="hint"><b>Your two stops don’t have to match, and they won’t.</b> Steering stops are rarely symmetric. The app solves caster and SAI together from the two angles you actually reached rather than assuming they mirror each other — assuming it would have quietly leaked your SAI into the caster number, about a quarter of a degree at a typical 37°/33° pair. Just go to the stop on each side and let it read whatever it reads.</p>
       <p class="hint"><b>Still sweep each wheel two or three times, re-seating the phone between sweeps.</b> Sweeps add up like camber readings, and the tile reports the spread so you can see whether to trust the number.</p>
       <div class="field" style="margin-top:10px"><label>Sweep style</label>
         <select id="sweepMode">
-          <option value="stops">Steer to the stops — hands-free, spoken</option>
+          <option value="cont">Keep sweeping — left, right, left, right, until you stop it</option>
+          <option value="stops">One pair — left stop, right stop, done</option>
           <option value="deg">Steer to ±15° — watching the phone</option>
         </select>
       </div>
@@ -420,8 +424,12 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <b>Any swing past ±8° is a valid sweep.</b> If the tires won’t pivot far enough to reach the stops — not slippery enough, or the brake creeping — just steer as far as they will go, stop, and hold. It captures wherever you stopped and uses that exact angle. A small swing isn’t wrong, only noisier: at ±8° expect roughly twice the scatter of ±15°, so take more sweeps to make up for it.
         If caster comes out around <b>−3° when +3° is expected</b>, the turn direction is flipped on your phone: use <span class="kbd">Flip turn sign</span> in Setup → Sensor details and re-run the sweep.
         <div style="margin-top:6px">Nothing beeping? The phone’s ringer switch mutes the web-audio guidance on some iPhones — flick it off silent, or turn <b>Voice</b> off and watch the dial instead.</div>
+        <div style="margin-top:6px"><b>Caster several times too big</b> (14° where 4° belongs) is the classic wrong-steer-angle signature, not scatter. Caster divides by sinθ, so an angle read three times too small comes back roughly three times too large. It used to happen when the gyro’s learned scale factor was missing or stale — the sweep now prefers the compass, which needs no scale, and warns when the two disagree. If you see the warning, re-run <b>Setup → flat check</b> with the compass working to repair the gyro as a backup.</div>
+        <div style="margin-top:6px"><b>Set Auto-Lock to Never</b> (Settings → Display &amp; Brightness) before a sweep. The web wake-lock does nothing on iPhone, and once the screen sleeps the sensors stop.</div>
+        <div style="margin-top:6px">Open <b>Captures from the last run</b> below after a sweep — it lists every angle and camber the app actually recorded, which is what to read out if a number still looks wrong.</div>
         <div style="margin-top:6px">SAI (steering-axis lean, small print under each result) is a free diagnostic: if one side differs a lot from the other with normal camber, suspect a bent spindle or strut.</div>
       </div></details>
+      <details><summary>Captures from the last run</summary><div class="dbody"><div class="mono" id="casLog" style="font-size:12px;white-space:pre-wrap">nothing captured yet</div></div></details>
       <details><summary>Adjusting caster on this vehicle</summary><div class="dbody" id="advCaster"></div></details>
     </div>
   </div>
@@ -760,6 +768,114 @@ function casterFrom(thL,cL,thR,cR,c0){
   if(Math.abs(det)<1e-6)return null;                   // both stops on the same side
   return{caster:(uL*dR-uR*dL)/det, sai:(sL*dR-sR*dL)/det};
 }
+
+/* Where the steer angle comes from, and why it stopped coming from the gyro.
+
+   The gyro path integrates rotationRate and multiplies by S.gyroScale, a
+   per-device factor learned from a compass spin during the flat check. That
+   makes theta -- and therefore caster, which divides by sin(theta) -- depend
+   on a stored number that can be silently wrong. It is reset to 1 by Reset
+   calibration, and it is never learned at all if the compass was unavailable
+   when the flat check ran, in which case it stays 1 on a phone that may
+   undercount rotation severely (this app already prints a note for a learned
+   scale above 5x, so that is not hypothetical). Get the scale wrong by k and
+   theta is wrong by about k, and caster comes back wrong by about the same
+   factor -- with nothing in a two-point sweep able to contradict it. That is
+   how a truck sitting at 4 degrees returned 14.
+
+   The compass needs none of that. Heading is absolute, so theta is a
+   DIFFERENCE of two readings rather than an integral: no scale to learn, no
+   bias to drift, and -- the part that matters with the phone taped to a wheel
+   and out of sight -- if motion events stop or throttle partway through the
+   turn, an integral loses that rotation permanently while a heading
+   difference never notices. Sign convention is the one already established
+   for the flat-check calibration: psi = -(accumulated heading change).
+
+   Gyro stays as the fallback when there is no compass, and both numbers are
+   recorded on every capture so a disagreement can be reported instead of
+   averaged into the answer. */
+function casTheta(){
+  const thG=sensor.yaw;
+  let thC=null;
+  if(sensor.hasCompass&&cas.acc0!=null)thC=-(sensor.compassAcc-cas.acc0);
+  const useC=thC!=null&&(sensor.compassAccuracy==null||sensor.compassAccuracy<=25);
+  return{th:useC?thC:thG,src:useC?"compass":"gyro",thG,thC};
+}
+
+function solve3(A,b){   // 3x3 Gauss-Jordan with partial pivoting
+  const M=[[A[0][0],A[0][1],A[0][2],b[0]],[A[1][0],A[1][1],A[1][2],b[1]],[A[2][0],A[2][1],A[2][2],b[2]]];
+  for(let i=0;i<3;i++){
+    let pv=i;for(let r=i+1;r<3;r++)if(Math.abs(M[r][i])>Math.abs(M[pv][i]))pv=r;
+    if(Math.abs(M[pv][i])<1e-12)return null;
+    const t=M[i];M[i]=M[pv];M[pv]=t;
+    for(let r=0;r<3;r++){if(r===i)continue;const f=M[r][i]/M[i][i];for(let c=i;c<4;c++)M[r][c]-=f*M[i][c];}
+  }
+  return[M[0][3]/M[0][0],M[1][3]/M[1][1],M[2][3]/M[2][2]];
+}
+
+/* Fit caster and SAI to EVERY capture in a run at once.
+
+       camber(theta) = c0 + C*sin(theta) - S*(1-cos(theta))
+
+   is linear in the three unknowns, so a whole left-right-left-right run is
+   one ordinary least-squares solve. Two things come out of that which no
+   two-point sweep can give:
+
+     - every capture contributes, so scatter falls as sqrt(n) within a single
+       run instead of needing whole repeated sweeps to average down;
+
+     - past three captures the fit is OVER-DETERMINED, so the residuals mean
+       something. A two-point sweep has exactly as many equations as unknowns:
+       it fits perfectly by construction and therefore can never report that
+       anything went wrong, which is exactly why a 14-degree reading came back
+       looking as clean as a 4-degree one. Residual RMS is now the headline
+       quality number for a run.
+
+   What the misfit does NOT catch is a wrong steer-angle scale. That was the
+   hope, and it is false -- measured, not assumed. Feed it angles a uniform
+   3.5x too small across a varied 35..-32 degree spread and the residual comes
+   back 0.022 degrees: over any realistic range, sin(k*theta) is fit almost
+   perfectly by a rescaled combination of sin(theta), (1-cos(theta)) and a
+   constant, so the error hides in C and S and the fit looks immaculate while
+   reporting 13.5 degrees for a 4-degree truck. Varying the angles does not
+   rescue it. The only defence against a bad angle is not to derive the angle
+   from a learned scale factor at all, which is what casTheta() is for, plus
+   the compass-vs-gyro cross-check that reports a disagreement out loud.
+
+   What the misfit DOES catch is inconsistent CAMBER: the bar shifting on the
+   wheel mid-run, one fumbled capture, tape letting go. Measured at a 0.20
+   degree per-capture placement scatter over 8 captures, a healthy run sits at
+   0.155 median and 0.217 at the 90th percentile; a bar that slips 0.8 degrees
+   partway through reads 0.405 median. Hence the thresholds below: under 0.22
+   good, 0.22-0.40 fair, over 0.40 means something moved -- re-run it. It
+   flags gross mechanical trouble, not subtle bias, and is described that way.
+
+   Varied angles are still worth asking for: they decorrelate C from S and
+   make the averaging real rather than repeating one geometry. */
+function lsqCaster(pts){
+  const n=pts.length;
+  if(n<3)return null;
+  const X=pts.map(q=>[1,Math.sin(R(q.th)),-(1-Math.cos(R(q.th)))]);
+  const A=[[0,0,0],[0,0,0],[0,0,0]],b=[0,0,0];
+  for(let k=0;k<n;k++)for(let i=0;i<3;i++){
+    b[i]+=X[k][i]*pts[k].camb;
+    for(let j=0;j<3;j++)A[i][j]+=X[k][i]*X[k][j];
+  }
+  const sol=solve3(A,b);
+  if(!sol)return null;
+  const c0=sol[0],caster=sol[1],sai=sol[2];
+  let rss=0;
+  for(let k=0;k<n;k++){const pr=c0+caster*X[k][1]+sai*X[k][2];rss+=(pts[k].camb-pr)*(pts[k].camb-pr);}
+  const df=n-3;
+  let se=null;
+  if(df>0){
+    const col=solve3(A,[0,1,0]);          // inv(AtA) second column -> variance of C
+    if(col&&col[1]>0)se=Math.sqrt((rss/df)*col[1]);
+  }
+  const ths=pts.map(q=>q.th);
+  return{c0,caster,sai,n,df,rms:Math.sqrt(rss/n),se,
+         thL:Math.max.apply(null,ths),thR:Math.min.apply(null,ths)};
+}
 function toeReduce(stations){
   // stations: [{id, t, psi}] — first and last share an id (closure)
   const first=stations[0], last=stations[stations.length-1];
@@ -843,7 +959,7 @@ const S={
   specs:store.get("specs",{}),          // per-vehicle overrides
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
   barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
-  sweepMode:store.get("sweepMode","stops"), // caster sweep: "stops" = steer to full lock, "deg" = steer to a set angle
+  sweepMode:store.get("sweepMode","cont"),  // "cont" = keep sweeping until stopped (fits all captures), "stops" = one lock-to-lock pair, "deg" = steer to a set angle
   voiceOn:store.get("voiceOn",true),    // spoken guidance during the caster sweep
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
@@ -880,7 +996,8 @@ const sensor={
   noise:1,stillSince:0,
   yaw:0,yawRun:false,gyroBias:[0,0,0],
   _buf:[],_rot:[0,0,0],
-  hasCompass:false,compassHeading:null,compassAccuracy:null,compassEvt:0
+  hasCompass:false,compassHeading:null,compassAccuracy:null,compassEvt:0,
+  compassAcc:0,compassLast:null   // continuously unwrapped total heading change
 };
 function onOrient(e){
   if(e.webkitCompassHeading!=null&&!isNaN(e.webkitCompassHeading)){
@@ -890,7 +1007,11 @@ function onOrient(e){
   }else if(e.absolute===true&&e.alpha!=null){
     sensor.hasCompass=true;sensor.compassHeading=(360-e.alpha)%360; // non-iOS absolute-orientation fallback
     sensor.compassAccuracy=null;sensor.compassEvt++;
-  }
+  }else return;
+  // Unwrap and accumulate, always, so any consumer can take a difference of
+  // two accumulator values and get a true signed rotation across 0/360.
+  if(sensor.compassLast!=null)sensor.compassAcc+=headingStepDelta(sensor.compassLast,sensor.compassHeading);
+  sensor.compassLast=sensor.compassHeading;
 }
 // signed shortest-path delta from a to b, in (-180,180] — safe only for steps well under 180°
 function headingStepDelta(a,b){return((b-a+540)%360)-180;}
@@ -1452,7 +1573,9 @@ function camSignFix(side){
 }
 
 /* ---------- caster sweep ---------- */
-const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false,_lastBeep:0};
+const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false,_lastBeep:0,
+  pts:[],acc0:null,warned:false,src:null};
+const casCont=()=>S.sweepMode==="cont";
 const CAS_MIN=8;   // below this the sweep is too small for the divisor to be trustworthy
 async function casterStart(wheel){
   if(!sensor.on){toast("Enable sensors first");return;}
@@ -1464,6 +1587,7 @@ async function casterStart(wheel){
   beep(900,0.05,0.2);
   keepAwake(true);
   cas.run=true;cas.wheel=wheel;cas.phase=1;cas.c0=cas.thL=cas.cL=cas.thR=cas.cR=null;
+  cas.pts=[];cas.acc0=null;cas.warned=false;cas.src=null;
   casUI();
   $("casMode").textContent="Caster sweep · "+wheel;
   toast("Wheels straight — hold the bar still on "+wheel);
@@ -1472,9 +1596,19 @@ async function casterStart(wheel){
   const s0=await sample(1500);
   sensor.gyroBias=s0.rot;
   sensor.yaw=0;sensor.yawRun=true;
+  cas.acc0=sensor.hasCompass?sensor.compassAcc:null;      // absolute steer-angle reference
   cas.c0=(S.camSign[cas.wheel]||1)*tiltZ(s0.g);
+  cas.pts=[{th:0,camb:cas.c0,src:"centre"}];              // centre is a data point like any other
   cas.phase=2;casUI();flash();beep(1200,0.1);
-  if(S.sweepMode==="stops"){
+  if(!sensor.hasCompass&&S.gyroScale===1){
+    // Nothing here can detect a rotationRate scale error, so say so up front.
+    toast("No compass — steer angle is an uncalibrated gyro integral, caster may be badly scaled");
+    say("Warning. No compass on this phone, so the steering angle is an uncalibrated gyro reading. The caster number may be scaled wrong.");
+  }
+  if(casCont()){
+    toast("Centre set — steer LEFT, hold; then right, then left, as many as you like");
+    say("Centre set. Go and steer left, hold it, and I will keep capturing. Vary how far you turn each time. Press stop and compute when you have had enough.");
+  }else if(S.sweepMode==="stops"){
     toast("Centre set — go steer LEFT to the stop and hold");
     say("Centre set. Go and steer left until it stops, then hold it there.");
   }else{
@@ -1482,12 +1616,43 @@ async function casterStart(wheel){
     say("Centre set. Steer left to "+cas.target+" degrees.");
   }
 }
-function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
+function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;cas.pts=[];cas.acc0=null;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
+// The Stop button finishes a continuous run instead of throwing it away.
+function casStopBtn(){
+  if(cas.run&&casCont()&&cas.pts.length>=4){finishCasterFit();return;}
+  if(cas.run&&casCont()&&cas.pts.length>1){toast("Only "+(cas.pts.length-1)+" capture(s) — need 3 to solve, 4 to check itself");say("Not enough captures yet. Keep going.");return;}
+  casterAbort();
+}
+// Compass and gyro are both recorded; a real disagreement is announced once
+// rather than quietly folded into the answer.
+function casCheckAgree(t){
+  if(cas.warned||t.thC==null||t.thG==null)return;
+  const a=Math.abs(t.thC),g=Math.abs(t.thG);
+  if(a<5)return;
+  if(Math.abs(a-g)>6&&Math.abs(a-g)>0.25*a){
+    cas.warned=true;
+    toast("Compass "+Math.round(a)+"° vs gyro "+Math.round(g)+"° — using compass; re-run the flat check to fix the gyro scale");
+    say("Heads up. The compass says "+Math.round(a)+" degrees but the gyro says "+Math.round(g)+". I am using the compass. Re-run the flat check to fix the gyro.");
+  }
+}
 async function casterGrab(which){
   const s=await sample(1100);
   const camb=(S.camSign[cas.wheel]||1)*tiltZ(s.g);
-  const th=sensor.yaw;
+  const t=casTheta();
+  const th=t.th;
   const deg=Math.round(Math.abs(th));
+  cas.src=t.src;
+  casCheckAgree(t);
+  if(casCont()){
+    cas.pts.push({th,camb,src:t.src,thG:t.thG,thC:t.thC});
+    cas.phase=3;flash();beep(1260,0.1);
+    const nCap=cas.pts.length-1;
+    const nextDir=th>0?"right":"left";
+    toast("Capture "+nCap+" at "+fmt(th,1)+"° — now steer "+nextDir.toUpperCase());
+    say("Got it. "+deg+" degrees "+(th>0?"left":"right")+". That is "+nCap+". Now steer "+nextDir+".");
+    casUI();
+    return;
+  }
   if(which==="L"){
     cas.thL=th;cas.cL=camb;cas.phase=3;flash();beep(1200,0.1);
     toast("Got it at "+fmt(th,1)+"° — now steer RIGHT through centre");
@@ -1536,6 +1701,28 @@ function casStat(sweeps){
   const sa=sweeps.map(x=>x.sai).filter(v=>v!=null);
   return{sweeps,n,caster,sd,se:(sd!=null?sd/Math.sqrt(n):null),sai:sa.length?avg(sa):null,when:Date.now()};
 }
+/* Finish a continuous run: one least-squares fit over every capture. */
+function finishCasterFit(){
+  cas.run=false;sensor.yawRun=false;keepAwake(false);hush();
+  const r=lsqCaster(cas.pts);
+  $("casMode").textContent="Caster sweep";
+  if(!r){toast("Couldn't solve — captures too alike, vary the steering amounts");say("Could not solve that. The captures were too alike. Vary how far you turn.");cas.phase=0;casUI();return;}
+  const spread=Math.max.apply(null,cas.pts.map(q=>q.th))-Math.min.apply(null,cas.pts.map(q=>q.th));
+  if(spread<2*CAS_MIN){toast("Swing too small overall — steer further");say("Swing too small. Steer further.");cas.phase=0;casUI();return;}
+  const prev=S.sess.cas[cas.wheel];
+  const entry={caster:r.caster,sai:r.sai,thL:r.thL,thR:r.thR,c0:r.c0,
+               nCap:r.n,rms:r.rms,fitSe:r.se,src:cas.src,pts:cas.pts.slice()};
+  const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
+  S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
+  cas.pts=[];cas.acc0=null;          // run is stored; the log now reads it back from there
+  cas.phase=4;casUI();renderResults();
+  const bad=r.rms>0.40;   // see lsqCaster: healthy runs sit near 0.16, p90 0.22
+  toast(`${cas.wheel} caster ${fmt(r.caster)}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
+  say("Caster "+r.caster.toFixed(1)+" degrees, from "+(r.n-1)+" captures"+
+      (r.se!=null?", give or take "+r.se.toFixed(2):"")+". "+
+      (bad?"But the captures disagree with each other by "+r.rms.toFixed(2)+" degrees, so do not trust that number. Check the bar is still taped tight and run it again."
+          :"The captures agree well."));
+}
 function finishCaster(){
   cas.run=false;sensor.yawRun=false;keepAwake(false);
   const r=casterFrom(cas.thL,cas.cL,cas.thR,cas.cR,cas.c0);
@@ -1550,7 +1737,34 @@ function finishCaster(){
   say("Caster "+m.caster.toFixed(1)+" degrees"+(m.sd!=null?", spread "+m.sd.toFixed(2):"")+". "+(m.n<3?"Re-seat the phone and sweep again.":""));
 }
 function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
+// The raw captures, so a suspect result can be read back instead of guessed at.
+function casLogUI(){
+  const el=$("casLog");if(!el)return;
+  let pts=cas.pts&&cas.pts.length>1?cas.pts:null,head="in progress";
+  if(!pts){
+    for(const w of["LF","RF"]){
+      const m=S.sess.cas[w],last=m&&m.sweeps&&m.sweeps.length?m.sweeps[m.sweeps.length-1]:null;
+      if(last&&last.pts&&last.pts.length>1){pts=last.pts;head=w+" · misfit ±"+(last.rms!=null?last.rms.toFixed(3):"?")+"°";}
+    }
+  }
+  if(!pts){el.textContent="nothing captured yet";return;}
+  const rows=pts.map((q,i)=>{
+    const lbl=i===0?"centre":String(i);
+    const both=(q.thC!=null&&q.thG!=null)?"   compass "+q.thC.toFixed(1)+"  gyro "+q.thG.toFixed(1):"";
+    return lbl.padStart(6)+"  steer "+fmt(q.th,1).padStart(7)+"°   camber "+fmt(q.camb,2).padStart(7)+"°"+both;
+  });
+  el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
+}
 function casStepsUI(){
+  if(casCont()){
+    const tc=[
+      "Bar taped on the wheel, wheels straight. Tap a sweep button and <b>hold the bar still</b> until it chirps — that is the centre reading. Then walk to the cab.",
+      "Steer <b>one way and hold</b>. It captures and says which number that was, then tells you to go the other way. Keep alternating — <b>vary how far you turn each time</b>, some near the stops and some only part way.",
+      "When you have <b>six or eight</b> captures, press <b>Stop</b>. It fits caster and SAI to all of them at once and tells you both the answer and how well the captures agreed."
+    ];
+    for(let i=1;i<=3;i++){const el=$("cstep"+i);if(el)el.querySelector(".stept").innerHTML=tc[i-1];}
+    return;
+  }
   const stops=S.sweepMode==="stops";
   const t=stops?[
     "Wheels straight, bar taped on the wheel, tap a sweep button and <b>hold the bar still</b> until it chirps — that’s the centre reading. Then walk to the cab; the wheel isn’t moving, so nothing is lost while you do.",
@@ -1570,10 +1784,18 @@ function casUI(){
     $("cas"+w+"v").textContent=m?fmt(m.caster,2)+"°":"–";
     if(!m){$("cas"+w+"s").textContent="";continue;}
     const last=(m.sweeps&&m.sweeps.length)?m.sweeps[m.sweeps.length-1]:null;
-    const q=m.sd==null?"sweep again":(m.sd<0.25?"good":m.sd<0.6?"fair":"scattered — re-seat and repeat");
+    // A fitted run carries its own quality, so a single good run no longer
+    // has to say "sweep again" when it already checked itself.
+    const fit=last&&last.rms!=null?last:null;
+    const q=fit?(fit.rms<0.22?"captures agree well":fit.rms<0.40?"captures agree":"captures disagree — something moved, re-run")
+              :(m.sd==null?"sweep again":(m.sd<0.25?"good":m.sd<0.6?"fair":"scattered — re-seat and repeat"));
     $("cas"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+" · "+q+
-      "<br>"+(last?"last swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
+      (fit?"<br>"+(fit.nCap-1)+" captures · misfit ±"+fit.rms.toFixed(2)+"°"+(fit.fitSe!=null?" · fit ±"+fit.fitSe.toFixed(2)+"°":"")+" · "+(fit.src||"?"):"")+
+      "<br>"+(last?"swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
   }
+  const b=$("btnCasAbort");
+  if(b)b.textContent=(cas.run&&casCont()&&cas.pts.length>=4)?"Stop & compute":"Stop";
+  casLogUI();
 }
 
 /* ---------- toe: gyro carry ---------- */
@@ -1883,12 +2105,16 @@ function tick(){
     $("stCas").classList.toggle("on",!!steadyNow);
     setOrient("orientCas","orientCasTxt",liveRollError(sensor.g),"plumb");
     if(cas.run&&cas.phase>=2){
-      const psi=sensor.yaw;
+      const tAng=casTheta();
+      const psi=tAng.th;
       $("roCas").classList.remove("dead");
       $("roCas").innerHTML=fmt(psi,1)+'<span class="u">°</span>';
       const camb=(S.camSign[cas.wheel]||1)*tiltZ(sensor.g);
-      $("roCasA").textContent="camber "+fmt(camb)+"°";
-      const dir=cas.phase===2?1:-1;
+      $("roCasA").textContent="camber "+fmt(camb)+"° · "+tAng.src;
+      // Continuous mode just wants the other way from wherever it last
+      // captured, so left-right-left-right falls out of holding still.
+      const lastPt=cas.pts.length>1?cas.pts[cas.pts.length-1]:null;
+      const dir=casCont()?((lastPt&&lastPt.th>0)?-1:1):(cas.phase===2?1:-1);
       const held=sensor.stillSince?performance.now()-sensor.stillSince:0;
       const far=Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN;
       const grab=()=>{cas._busy=true;casterGrab(dir>0?"L":"R").finally(()=>cas._busy=false);};
@@ -1903,7 +2129,9 @@ function tick(){
       }else{
         // No target to hit: he steers to the mechanical stop and holds, and
         // whatever angle that turns out to be is the angle the maths uses.
-        $("roCasB").textContent=far?"far enough — stop and hold":"steer "+(dir>0?"LEFT":"RIGHT")+" to the stop";
+        const nCap=cas.pts.length-1;
+        $("roCasB").textContent=far?"far enough — stop and hold"
+          :(casCont()?(nCap+" captured · steer "+(dir>0?"LEFT":"RIGHT")):"steer "+(dir>0?"LEFT":"RIGHT")+" to the stop");
         drawBubble($("bubCas"),psi,{span:45});
         if(!cas._busy&&far&&held>1800)grab();
       }
@@ -1975,7 +2203,7 @@ $("btnCamSignR").addEventListener("click",()=>camSignFix("R"));
 document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click",()=>casClear(b.dataset.casclr)));
 $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
-$("btnCasAbort").addEventListener("click",casterAbort);
+$("btnCasAbort").addEventListener("click",casStopBtn);
 $("sweepMode").value=S.sweepMode;
 $("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();});
 casStepsUI();
