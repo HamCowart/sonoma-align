@@ -1033,7 +1033,7 @@ const S={
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
   barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
   stops:store.get("stops",{}),          // per-vehicle steering-lock angles {L:{deg,...},R:{deg,...}}, measured once with a tape
-  sweepMode:store.get("sweepMode","cal"),   // "cal" = steering stops with tape-measured angles (no angle sensor), "cont" = keep sweeping on sensor angles, "stops" = one pair, "deg" = steer to a set angle
+  sweepMode:store.get("sweepMode","cont"),   // "cal" = steering stops with tape-measured angles (no angle sensor), "cont" = keep sweeping on sensor angles, "stops" = one pair, "deg" = steer to a set angle
   voiceOn:store.get("voiceOn",true),    // spoken guidance during the caster sweep
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
@@ -1065,10 +1065,7 @@ function shimFor(r){return Math.abs(Math.tan(R(r))*trackIn());}
    produced readings of 3 and 6 degrees on a truck that sits at 4, so nobody
    should still be defaulting into one. Flagged rather than forced every
    load, so a deliberate later choice of another mode is never overridden. */
-if(!store.get("calMigrated",false)){
-  store.set("calMigrated",true);
-  if(S.sweepMode!=="cal"){S.sweepMode="cal";store.set("sweepMode","cal");}
-}
+
 function saveSpecs(){store.set("specs",S.specs);}
 
 /* ---------- steering-stop angles, measured once with a tape ----------
@@ -1950,11 +1947,33 @@ function finishCasterFit(){
       cas.run=true;sensor.yawRun=true;cas.phase=3;casUI();return;   // stay in the run, do not lose the captures
     }
   }
-  const r=lsqCaster(cas.pts);
-  if(!r){toast("Couldn't solve — captures too alike, vary the steering amounts");say("Could not solve that. The captures were too alike. Vary how far you turn.");cas.phase=0;casUI();return;}
-  const spread=Math.max.apply(null,cas.pts.map(q=>q.th))-Math.min.apply(null,cas.pts.map(q=>q.th));
-  if(spread<2*CAS_MIN){toast("Swing too small overall — steer further");say("Swing too small. Steer further.");cas.phase=0;casUI();return;}
+  /* A capture taken short of the lock is the one mistake this method cannot
+     see in the camber data -- it gets recorded as a full lock and there is
+     nothing in the numbers to contradict it. Auto-capture fires after 1.8
+     seconds of stillness, and pausing that long part way through a stiff
+     turn is an entirely ordinary thing to do, so this is not a rare case.
+     Earlier code folded such a capture into the fit and mentioned it
+     afterwards, which is the wrong way round: DROP it and refit. */
   const chk=casCal()?casStopCheck(cas.pts):null;
+  const dropped=chk?new Set(chk.bad.map(b=>b.n)):new Set();
+  const used=cas.pts.filter((q,i)=>!dropped.has(i));
+  if(dropped.size){
+    const stillL=used.some(q=>q.side==="L"),stillR=used.some(q=>q.side==="R");
+    if(used.length<4||!stillL||!stillR){
+      // Not enough survived. Keep the run alive rather than binning his work.
+      toast(dropped.size+" capture"+(dropped.size>1?"s were":" was")+" short of the stop — not enough left, keep sweeping");
+      say(dropped.size+" capture"+(dropped.size>1?"s were":" was")+" short of the stop, and there is not enough left to work with. Keep going, and hold hard against the lock each time.");
+      cas.run=true;sensor.yawRun=true;cas.phase=3;casUI();return;
+    }
+  }
+  const r=lsqCaster(used);
+  if(!r){
+    const m=casCal()?"Couldn't solve — need captures at both stops":"Couldn't solve — captures too alike, vary the steering amounts";
+    toast(m);say(casCal()?"Could not solve that. I need captures at both stops.":"Could not solve that. The captures were too alike. Vary how far you turn.");
+    cas.phase=0;casUI();return;
+  }
+  const spread=Math.max.apply(null,used.map(q=>q.th))-Math.min.apply(null,used.map(q=>q.th));
+  if(spread<2*CAS_MIN){toast("Swing too small overall — steer further");say("Swing too small. Steer further.");cas.phase=0;casUI();return;}
   // What the sensors WOULD have said, now that a trustworthy angle exists to
   // compare them against. This is the only place in the app where the steer
   // angle has a known truth, so it is the only place the sensors can be
@@ -1962,18 +1981,21 @@ function finishCasterFit(){
   let ratio=null;
   if(chk&&chk.L!=null&&casStops())ratio=chk.L/casStops().L.deg;
   const prev=S.sess.cas[cas.wheel];
+  // Every capture is kept in the log, flagged, so a dropped one can be seen
+  // rather than silently vanishing; only `used` reached the fit.
+  const logPts=cas.pts.map((q,i)=>dropped.has(i)?Object.assign({},q,{dropped:true}):q);
   const entry={caster:r.caster,sai:r.sai,thL:r.thL,thR:r.thR,c0:r.c0,
-               nCap:r.n,rms:r.rms,fitSe:r.se,src:casCal()?"stops":cas.src,pts:cas.pts.slice(),
-               cal:casCal(),stopBad:chk?chk.bad.length:0,sensorRatio:ratio};
+               nCap:r.n,rms:r.rms,fitSe:r.se,src:casCal()?"stops":cas.src,pts:logPts,
+               cal:casCal(),stopBad:dropped.size,sensorRatio:ratio};
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
   cas.pts=[];cas.acc0=null;cas.testReport=null;   // run is stored; the log reads it back from there
   cas.phase=4;casUI();renderResults();
   const bad=r.rms>0.40;   // see lsqCaster: healthy runs sit near 0.16, p90 0.22
-  if(chk&&chk.bad.length){
-    const which=chk.bad.map(b=>b.n).join(", ");
-    toast("Capture "+which+" looks short of the stop — clear this wheel and re-run");
-    say("Warning. "+chk.bad.length+" capture"+(chk.bad.length>1?"s":"")+" looked short of the stop. Clear this wheel and run it again, making sure you hold it hard against the lock each time.");
+  if(dropped.size){
+    const which=Array.from(dropped).join(", ");
+    toast("Dropped capture "+which+" — short of the stop. Answer uses the other "+(r.n-1)+".");
+    say("Note. I dropped "+dropped.size+" capture"+(dropped.size>1?"s":"")+" that "+(dropped.size>1?"were":"was")+" short of the stop. The answer uses the other "+(r.n-1)+". Hold hard against the lock every time and you will not lose any.");
   }
   toast(`${cas.wheel} caster ${fmt(r.caster)}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
   say("Caster "+r.caster.toFixed(1)+" degrees, from "+(r.n-1)+" captures"+
@@ -2101,7 +2123,9 @@ function casLogUI(){
   const rows=pts.map((q,i)=>{
     const lbl=i===0?"centre":String(i);
     const both=(q.thC!=null&&q.thG!=null)?"   compass "+q.thC.toFixed(1)+"  gyro "+q.thG.toFixed(1):"";
-    return lbl.padStart(6)+"  steer "+fmt(q.th,1).padStart(7)+"°   camber "+fmt(q.camb,2).padStart(7)+"°"+both;
+    const raw=(q.sensor!=null)?"   sensor "+q.sensor.toFixed(1):"";
+    const flag=q.dropped?"   << DROPPED, short of the stop":"";
+    return lbl.padStart(6)+"  steer "+fmt(q.th,1).padStart(7)+"°   camber "+fmt(q.camb,2).padStart(7)+"°"+(raw||both)+flag;
   });
   el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
 }
