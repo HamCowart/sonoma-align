@@ -392,18 +392,51 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing and grabs camber by itself each time you hold still.</p>
       <p class="hint"><b>Keep sweeping until you press Stop, and vary how far you turn.</b> Every hold is another data point, and the app fits caster and SAI to all of them at once. Eight captures cut the scatter to about 0.15° where a single lock-to-lock pair gives 0.26°, and because there are then more readings than unknowns the fit also reports a <b>misfit</b> — how well the captures agree with each other. A single pair has no spare readings, so it fits perfectly no matter how wrong it is and can never warn you about anything.</p>
       <p class="hint"><b>What misfit catches:</b> the bar shifting on the wheel, tape letting go, one fumbled capture. Under <b>0.22°</b> is healthy, over <b>0.40°</b> means something moved — re-tape and run it again. What it does <i>not</i> catch is a wrongly scaled steer angle: that error hides inside the fit almost perfectly, which is why the angle now comes from the compass instead of a learned gyro scale, and why a compass/gyro disagreement is announced out loud rather than left to the misfit to notice.</p>
-      <p class="hint"><b>Steer angle now comes from the compass, not the gyro.</b> Heading is absolute, so the angle is a difference between two readings instead of an integral — nothing to drift, no per-device scale factor to get wrong, and nothing lost if the phone’s motion events stall partway through a turn. If the compass and the gyro disagree, it says so out loud and uses the compass.</p>
+      <p class="hint"><b>The steer angle comes off a tape measure now — no sensor involved.</b> Measure your two steering locks once (below), and every sweep after that uses those stored numbers. This is how an alignment rack does it: the angle is read from a mechanical protractor in the turnplate, never from a sensor riding on the wheel. Your steering stops are a better reference than a turnplate anyway — metal on metal, the same angle every single time, and you can feel them without looking.</p>
+      <p class="hint"><b>Why the phone can’t do it.</b> Two honest attempts both failed on the truck. The gyro needs a learned scale factor that can be stale or reset — that was the 14° reading. The compass fails worse and less obviously: the phone is taped to a <b>steel wheel with a cast-iron brake rotor right behind it</b>, and that iron turns <i>with</i> the phone, so its magnetic pull sits fixed in the phone’s frame while the earth’s field swings past. How wrong the heading comes out depends on which way the truck happens to be parked and where the wheel sits rotationally — both of which change between runs. Simulated with a realistic offset, the same truck and the same camber readings gave <b>2.2°, 3.1°, 4.2°, 4.8°, 5.4°, 5.7°, 5.9° and 6.0°</b> purely from being parked eight different ways. It also can’t tell steering from the wheel simply <i>rolling</i>, which spins the phone and swings the heading with it.</p>
+      <p class="hint"><b>What can still go wrong, and how it’s caught.</b> With the angle stored, the one remaining mistake is stopping <i>short</i> of the lock — that would be recorded as a full lock, and no amount of camber maths could tell. So the sweep still watches the sensor, not to measure the angle but to check every capture on a side reads about the same as the others. A distorted compass is perfectly repeatable even when it’s wildly inaccurate, which is exactly what that check needs.</p>
       <p class="hint"><b>You don’t have to hit any particular angle, and you don’t have to look at anything.</b> Steer until the wheel stops, hold it there, and it captures — then tells you out loud what it got. The maths uses the angle you actually reached, whatever it was, so the steering stop makes a perfect reference: it’s the same place every single time and you can feel it.</p>
       <p class="hint"><b>Going to the stops is also more accurate than the old ±15°.</b> Caster comes from a camber difference divided by sinθL−sinθR. At ±15° that divisor is 0.518, so every bit of hand-placement scatter comes back <b>1.9× bigger</b>. At full lock, around ±35°, the divisor is about 1.15 — it <b>shrinks</b> the scatter to 0.87× instead. End to end that is a bit over <b>twice as steady</b> a number for the same sloppiness.</p>
       <p class="hint"><b>Your two stops don’t have to match, and they won’t.</b> Steering stops are rarely symmetric. The app solves caster and SAI together from the two angles you actually reached rather than assuming they mirror each other — assuming it would have quietly leaked your SAI into the caster number, about a quarter of a degree at a typical 37°/33° pair. Just go to the stop on each side and let it read whatever it reads.</p>
       <p class="hint"><b>Still sweep each wheel two or three times, re-seating the phone between sweeps.</b> Sweeps add up like camber readings, and the tile reports the spread so you can see whether to trust the number.</p>
       <div class="field" style="margin-top:10px"><label>Sweep style</label>
         <select id="sweepMode">
-          <option value="cont">Keep sweeping — left, right, left, right, until you stop it</option>
+          <option value="cal">Steering stops, angle from the tape — no angle sensor used</option>
+          <option value="cont">Keep sweeping — angle from the phone’s sensors</option>
           <option value="stops">One pair — left stop, right stop, done</option>
           <option value="deg">Steer to ±15° — watching the phone</option>
         </select>
       </div>
+      <details id="casCalWrap" style="margin-top:10px"><summary>Steering-stop angles — measure once with a tape</summary><div class="dbody">
+        <div id="casCalState" class="small" style="margin-bottom:8px"></div>
+        <b>Do this once per vehicle.</b> It replaces the phone’s steer-angle sensor entirely, which is the thing that has been wrong.
+        <ol style="margin:8px 0 8px 18px;padding:0">
+          <li>Front wheels <b>dead straight</b>. Lay the straight edge flat against the <b>rim flange</b>, front and rear — not the tire sidewall, which bulges. It should stick out past the tire at both ends.</li>
+          <li><b>Chalk a line on the floor along the edge.</b> That line is your zero.</li>
+          <li>Steer <b>fully to the left stop</b>. Re-seat the edge flat on the rim the same way.</li>
+          <li>Measure the <b>perpendicular distance from the chalk line to each end of the edge</b> — front end and rear end. At full lock they land on <i>opposite</i> sides of the line.</li>
+          <li>Repeat at the right stop. Enter all four numbers.</li>
+        </ol>
+        <p class="hint" style="margin:0 0 8px"><b>You don’t have to put the edge back in the same spot on the rim.</b> The wheel pivots about the steering axis, not about the middle of your edge, so the edge slides sideways as it turns — and the <i>difference</i> between the two end offsets cancels that out completely. Flat against the rim is the only thing that matters.</p>
+        <div class="grid2">
+          <div class="field"><label>Straight edge ″</label><input id="calLen" type="number" step="0.25" min="12" inputmode="decimal"></div>
+          <div class="field"><label>Ends sit</label><select id="calSide"><option value="opp">opposite sides of line</option><option value="same">same side of line</option></select></div>
+        </div>
+        <div class="grid2" style="margin-top:6px">
+          <div class="field"><label>LEFT stop · front ″</label><input id="calLF" type="number" step="0.125" min="0" inputmode="decimal"></div>
+          <div class="field"><label>LEFT stop · rear ″</label><input id="calLR" type="number" step="0.125" min="0" inputmode="decimal"></div>
+        </div>
+        <div class="grid2" style="margin-top:6px">
+          <div class="field"><label>RIGHT stop · front ″</label><input id="calRF" type="number" step="0.125" min="0" inputmode="decimal"></div>
+          <div class="field"><label>RIGHT stop · rear ″</label><input id="calRR" type="number" step="0.125" min="0" inputmode="decimal"></div>
+        </div>
+        <div id="calPreview" class="small mono" style="margin-top:8px;white-space:pre-wrap"></div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn primary" id="btnCalSave">Save stop angles</button>
+          <button class="btn ghost" id="btnCalClear">Clear</button>
+        </div>
+        <div style="margin-top:8px">A quarter-inch of slop in those measurements is about half a degree of stop angle, and half a degree of stop angle is about <b>0.05°</b> of caster. The tape is roughly five times more accurate than this needs — which is the whole point of getting the angle off a tape instead of a sensor.</div>
+      </div></details>
       <div class="note" style="margin-top:8px"><b>Tape the phone to the wheel sideways</b> — long axis pointing front-to-back, not up-and-down. The steer angle is read off the compass, and steering pivots the wheel about a near-vertical axis: mounted upright that axis runs straight through the phone’s own top, so the top keeps pointing at the sky and the compass has no horizontal direction to report. Turned sideways the top swings through the horizontal plane by exactly the steer angle. <b>Camber reads identically either way</b> — it only uses the tilt of the screen, which doesn’t change when you rotate the phone in its own plane — so the sideways mount is free. The app checks which way round it is and says so; <b>Check steer sensors</b> proves it on your phone in about thirty seconds.</div>
       <div class="note" style="margin-top:8px">Engine off, <b>brake held hard</b> the whole sweep — a helper or a board wedged from the seat to the pedal. Front tires on something slippery (two vinyl tiles with grease between, or a pair of plastic bags each) so they can pivot.</div>
       <div class="btnrow" style="margin-top:10px">
@@ -426,7 +459,8 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <b>Any swing past ±8° is a valid sweep.</b> If the tires won’t pivot far enough to reach the stops — not slippery enough, or the brake creeping — just steer as far as they will go, stop, and hold. It captures wherever you stopped and uses that exact angle. A small swing isn’t wrong, only noisier: at ±8° expect roughly twice the scatter of ±15°, so take more sweeps to make up for it.
         If caster comes out around <b>−3° when +3° is expected</b>, the turn direction is flipped on your phone: use <span class="kbd">Flip turn sign</span> in Setup → Sensor details and re-run the sweep.
         <div style="margin-top:6px">Nothing beeping? The phone’s ringer switch mutes the web-audio guidance on some iPhones — flick it off silent, or turn <b>Voice</b> off and watch the dial instead.</div>
-        <div style="margin-top:6px"><b>Caster several times too big</b> (14° where 4° belongs) is the classic wrong-steer-angle signature, not scatter. Caster divides by sinθ, so an angle read three times too small comes back roughly three times too large. It used to happen when the gyro’s learned scale factor was missing or stale — the sweep now prefers the compass, which needs no scale, and warns when the two disagree. If you see the warning, re-run <b>Setup → flat check</b> with the compass working to repair the gyro as a backup.</div>
+        <div style="margin-top:6px"><b>Caster wandering run to run</b> — 3° one time, 6° the next, with the app insisting the captures agreed — is the signature of a bad steer angle, not of scatter. Captures inside one run share the same bad angle so they agree perfectly; whole runs disagree because the angle changes between them. The cure is the tape-calibrated sweep above. If you are using a sensor mode and seeing this, switch.</div>
+        <div style="margin-top:6px"><b>Caster several times too big</b> (14° where 4° belongs) is the same disease further along: caster divides by sinθ, so an angle read three times too small comes back three times too large.</div>
         <div style="margin-top:6px"><b>Set Auto-Lock to Never</b> (Settings → Display &amp; Brightness) before a sweep. The web wake-lock does nothing on iPhone, and once the screen sleeps the sensors stop.</div>
         <div style="margin-top:6px">Open <b>Captures from the last run</b> below after a sweep — it lists every angle and camber the app actually recorded, which is what to read out if a number still looks wrong.</div>
         <div style="margin-top:6px">SAI (steering-axis lean, small print under each result) is a free diagnostic: if one side differs a lot from the other with normal camber, suspect a bent spindle or strut.</div>
@@ -998,7 +1032,8 @@ const S={
   specs:store.get("specs",{}),          // per-vehicle overrides
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
   barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
-  sweepMode:store.get("sweepMode","cont"),  // "cont" = keep sweeping until stopped (fits all captures), "stops" = one lock-to-lock pair, "deg" = steer to a set angle
+  stops:store.get("stops",{}),          // per-vehicle steering-lock angles {L:{deg,...},R:{deg,...}}, measured once with a tape
+  sweepMode:store.get("sweepMode","cal"),   // "cal" = steering stops with tape-measured angles (no angle sensor), "cont" = keep sweeping on sensor angles, "stops" = one pair, "deg" = steer to a set angle
   voiceOn:store.get("voiceOn",true),    // spoken guidance during the caster sweep
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
@@ -1025,7 +1060,87 @@ function trackIn(){return spec().track||prof().track||55.5;}
 function barIn(){return Math.max(6,S.barLen||48);}
 // shim thickness under the low-side tires that would cancel a roll of r degrees
 function shimFor(r){return Math.abs(Math.tan(R(r))*trackIn());}
+/* One-time move onto the tape-calibrated sweep. Every sensor-based mode
+   derives theta from a phone strapped to a steel wheel, which is what
+   produced readings of 3 and 6 degrees on a truck that sits at 4, so nobody
+   should still be defaulting into one. Flagged rather than forced every
+   load, so a deliberate later choice of another mode is never overridden. */
+if(!store.get("calMigrated",false)){
+  store.set("calMigrated",true);
+  if(S.sweepMode!=="cal"){S.sweepMode="cal";store.set("sweepMode","cal");}
+}
 function saveSpecs(){store.set("specs",S.specs);}
+
+/* ---------- steering-stop angles, measured once with a tape ----------
+
+   WHY THIS EXISTS. Caster is a camber difference divided by sin(thetaL) -
+   sin(thetaR), so the whole measurement is only as good as theta. Two
+   attempts at getting theta from the phone both failed on the truck:
+
+     gyro    -- integrates rotationRate and multiplies by a learned scale
+                factor that can be stale, reset, or never learned. Read the
+                angle 3.5x small and caster comes back 3.5x large.
+
+     compass -- the phone is taped to a STEEL WHEEL with a cast-iron brake
+                rotor and hub right behind it. That ferrous mass turns WITH
+                the phone, so its hard-iron offset is fixed in the phone's
+                frame while the earth's field rotates, and the reported
+                heading becomes a nonlinear function of the true rotation.
+                How wrong depends on which way the truck is parked and where
+                the wheel sits rotationally -- both of which change between
+                runs, especially when the truck is rolled to settle the
+                suspension. It also cannot tell steering from the wheel
+                simply ROLLING, which spins the phone about the screen
+                normal and swings the heading with it.
+
+   That is the signature James saw: captures agreeing beautifully inside a
+   run (same distortion every capture) while whole runs disagreed 3 vs 6
+   degrees (different distortion run to run).
+
+   THE WAY OUT is the way every alignment rack does it: do not ask a sensor
+   on the wheel for the steer angle at all. A rack reads it off a mechanical
+   protractor in the turnplate. James has no turnplates, but he does have
+   something just as good and even more repeatable -- the STEERING STOPS.
+   Metal on metal, the same angle every single time, and he can feel them
+   without looking, which is what makes the sweep hands-free in the first
+   place. Measure those two angles ONCE with a tape, store them, and the
+   sweep needs no angle sensor ever again.
+
+   THE MEASUREMENT. Lay the straight edge flat against the rim flange front
+   and rear, wheel pointed straight, and chalk a line on the floor along it.
+   Steer to the stop, re-seat the edge the same way, and measure the
+   perpendicular distance from that chalk line to each end of the edge.
+
+       dFront(signed) = t + (L/2)*sin(theta)
+       dRear (signed) = t - (L/2)*sin(theta)      [t = sideways shift]
+   =>  dFront - dRear = L*sin(theta)
+
+   Note what drops out: t. The bar rotates about the steering axis, not
+   about its own middle, so it slides sideways as well as turning -- and the
+   DIFFERENCE of the two offsets does not care. He does not have to get the
+   edge back in the same spot on the rim, only flat against it. Any
+   consistent seating bias cancels too, because the straight-ahead chalk
+   line is itself drawn with the edge seated the same way.
+
+   HOW ACCURATE IS ENOUGH. dC/C = -cot(theta)*dtheta. At a ~35 degree lock
+   cot is 1.43, so holding caster to 0.2 degrees on a 4 degree truck needs
+   the stop angle to only about +/-2 degrees. Over a 48 inch edge the two
+   offsets differ by 48*sin(35) = 27.5 inches; measuring each to a quarter
+   inch puts theta inside +/-0.5 degrees. A tape measure is five times better
+   than this needs, and the stop's REPEATABILITY -- which is what actually
+   drives run-to-run scatter -- is better still. */
+function stopAngleFrom(dF,dR,L,opposite){
+  const a=Math.abs(Number(dF)),b=Math.abs(Number(dR)),len=Number(L);
+  if(!isFinite(a)||!isFinite(b)||!isFinite(len)||len<=0)return null;
+  const off=opposite?(a+b):Math.abs(a-b);
+  if(off<=0)return null;
+  if(off>=len)return null;                 // asin would be undefined: bad numbers
+  const deg=D(Math.asin(off/len));
+  if(deg<CAS_MIN)return null;              // too small to be a steering lock
+  return deg;
+}
+function casStops(){const t=S.stops[S.veh];return(t&&t.L&&t.R&&t.L.deg>0&&t.R.deg>0)?t:null;}
+function saveStops(){store.set("stops",S.stops);}
 function floorSlope(axle){const f=S.floors[S.veh];return f&&f[axle]?f[axle].slope:0;}
 
 /* ---------- sensor core ---------- */
@@ -1623,12 +1738,25 @@ function camSignFix(side){
 /* ---------- caster sweep ---------- */
 const cas={run:false,wheel:null,phase:0,c0:null,thL:null,cL:null,thR:null,cR:null,target:15,_busy:false,_lastBeep:0,
   pts:[],acc0:null,warned:false,src:null,mount:null,test:false,testReport:null};
-const casCont=()=>S.sweepMode==="cont";
+const casCont=()=>S.sweepMode==="cont"||S.sweepMode==="cal";  // multi-capture modes
+const casCal=()=>S.sweepMode==="cal";                          // ...with theta from the stored stops
+// In calibrated mode the sensor is demoted to a direction-and-did-you-move
+// detector, so the bar for "he has clearly turned" can be much lower than
+// the bar for "this angle is worth dividing by".
+const casGate=()=>casCal()?4:CAS_MIN;
 const CAS_MIN=8;   // below this the sweep is too small for the divisor to be trustworthy
 async function casterStart(wheel){
   if(!sensor.on){toast("Enable sensors first");return;}
   if(!sensor.hasRot){toast("No gyro on this device — caster sweep unavailable");return;}
   if(S.gyroSign===0){toast("Do the flat check first (Setup step 2) so turn direction is known");return;}
+  // Checked up front: being told to go and measure the stops only AFTER
+  // holding the bar still for the centre reading would be maddening.
+  if(casCal()&&!casStops()){
+    toast("Measure the steering-stop angles first — open “Steering-stop angles” on this screen");
+    say("No steering stop angles stored yet. Measure them once with a tape, under steering stop angles on the caster screen.");
+    const d=$("casCalWrap");if(d){d.open=true;d.scrollIntoView({behavior:"smooth",block:"center"});}
+    return;
+  }
   // Both of these have to be kicked off from inside the click itself: iOS
   // unlocks speech and audio on a user gesture and nowhere else.
   say("Starting "+wheel+". Wheels straight, hold the bar still.");
@@ -1649,7 +1777,12 @@ async function casterStart(wheel){
   cas.c0=(S.camSign[cas.wheel]||1)*tiltZ(s0.g);
   cas.pts=[{th:0,camb:cas.c0,src:"centre"}];              // centre is a data point like any other
   cas.phase=2;casUI();flash();beep(1200,0.1);
-  if(cas.mount==="portrait"&&sensor.hasCompass){
+  if(casCal()){
+    // Nothing downstream reads the compass or the gyro for the angle, so the
+    // portrait warning below would be noise. Say what IS being used instead.
+    const st=casStops();
+    toast("Using stored stops: left "+fmt(st.L.deg,1)+"°, right "+fmt(st.R.deg,1)+"°");
+  }else if(cas.mount==="portrait"&&sensor.hasCompass){
     // Worth interrupting for: it silently drops the sweep back onto the gyro.
     toast("Phone is upright on the wheel — compass can't see the steer there. Re-tape it sideways (long axis fore-and-aft).");
     say("Heads up. The phone is mounted upright. The compass cannot measure steering in that position, so I would be falling back to the gyro. Re-tape it sideways, long axis pointing front to back, and start again. Camber is unaffected either way.");
@@ -1700,12 +1833,29 @@ async function casterGrab(which){
   cas.src=t.src;
   casCheckAgree(t);
   if(casCont()){
-    cas.pts.push({th,camb,src:t.src,thG:t.thG,thC:t.thC});
+    let pt;
+    if(casCal()){
+      // The sensor said WHICH WAY he turned; the tape said HOW FAR the stop
+      // is. Only the second one goes into the maths. `sensor` is kept so the
+      // run can check he actually reached the stop each time, which needs the
+      // sensor to be repeatable but not to be right.
+      const st=casStops();
+      if(!st){toast("No stop angles stored — measure them first");say("No stop angles stored. Measure them first.");return;}
+      const left=th>0;
+      pt={th:left?st.L.deg:-st.R.deg,camb,src:"stop",side:left?"L":"R",
+          sensor:th,sensorSrc:t.src,thG:t.thG,thC:t.thC};
+    }else{
+      pt={th,camb,src:t.src,thG:t.thG,thC:t.thC};
+    }
+    cas.pts.push(pt);
     cas.phase=3;flash();beep(1260,0.1);
     const nCap=cas.pts.length-1;
-    const nextDir=th>0?"right":"left";
-    toast("Capture "+nCap+" at "+fmt(th,1)+"° — now steer "+nextDir.toUpperCase());
-    say("Got it. "+deg+" degrees "+(th>0?"left":"right")+". That is "+nCap+". Now steer "+nextDir+".");
+    const left=pt.th>0;
+    const nextDir=left?"right":"left";
+    const shown=Math.round(Math.abs(pt.th));
+    toast("Capture "+nCap+" · "+(left?"LEFT":"RIGHT")+" "+fmt(pt.th,1)+"°"+(casCal()?" (stored)":"")+" — now steer "+nextDir.toUpperCase());
+    say("Got it. "+(casCal()?(left?"Left":"Right")+" stop, "+shown+" degrees":shown+" degrees "+(left?"left":"right"))+
+        ". That is "+nCap+". Now steer "+nextDir+".");
     casUI();
     return;
   }
@@ -1757,22 +1907,74 @@ function casStat(sweeps){
   const sa=sweeps.map(x=>x.sai).filter(v=>v!=null);
   return{sweeps,n,caster,sd,se:(sd!=null?sd/Math.sqrt(n):null),sai:sa.length?avg(sa):null,when:Date.now()};
 }
+/* Did he actually reach the stop every time?
+
+   In calibrated mode theta is a stored constant, so a capture taken half way
+   to the lock gets recorded as a full lock and quietly corrupts the fit --
+   and nothing in the camber numbers reveals it. The sensor does. Note what
+   is being asked of it here: not to be ACCURATE, only to be REPEATABLE
+   within one run, which even a magnetically mangled compass manages as long
+   as the geometry repeats. So compare each capture against the median for
+   its own side and flag the ones that stand out.
+
+   Thresholds are deliberately loose (4 degrees AND 25%) because a distorted
+   compass is repeatable, not precise, and crying wolf on a good run would
+   teach him to ignore the warning. */
+function casStopCheck(pts){
+  const out={L:null,R:null,bad:[]};
+  for(const side of["L","R"]){
+    const g=pts.filter(q=>q.side===side&&isFinite(q.sensor)).map(q=>Math.abs(q.sensor));
+    if(!g.length)continue;
+    const sorted=g.slice().sort((a,b)=>a-b);
+    const med=sorted[Math.floor(sorted.length/2)];
+    out[side]=med;
+    if(!(med>0))continue;
+    pts.forEach((q,i)=>{
+      if(q.side!==side||!isFinite(q.sensor))return;
+      const d=Math.abs(Math.abs(q.sensor)-med);
+      if(d>4&&d>0.25*med)out.bad.push({n:i,side:side,sensor:q.sensor,med:med});
+    });
+  }
+  return out;
+}
 /* Finish a continuous run: one least-squares fit over every capture. */
 function finishCasterFit(){
   cas.run=false;sensor.yawRun=false;keepAwake(false);hush();
-  const r=lsqCaster(cas.pts);
   $("casMode").textContent="Caster sweep";
+  const caps=cas.pts.filter(q=>q.src!=="centre");
+  if(casCal()){
+    const haveL=caps.some(q=>q.side==="L"),haveR=caps.some(q=>q.side==="R");
+    if(!haveL||!haveR){
+      toast("Need captures at BOTH stops — only the "+(haveL?"left":"right")+" was caught");
+      say("I need captures at both stops. Only the "+(haveL?"left":"right")+" side was caught. Steer the other way and hold.");
+      cas.run=true;sensor.yawRun=true;cas.phase=3;casUI();return;   // stay in the run, do not lose the captures
+    }
+  }
+  const r=lsqCaster(cas.pts);
   if(!r){toast("Couldn't solve — captures too alike, vary the steering amounts");say("Could not solve that. The captures were too alike. Vary how far you turn.");cas.phase=0;casUI();return;}
   const spread=Math.max.apply(null,cas.pts.map(q=>q.th))-Math.min.apply(null,cas.pts.map(q=>q.th));
   if(spread<2*CAS_MIN){toast("Swing too small overall — steer further");say("Swing too small. Steer further.");cas.phase=0;casUI();return;}
+  const chk=casCal()?casStopCheck(cas.pts):null;
+  // What the sensors WOULD have said, now that a trustworthy angle exists to
+  // compare them against. This is the only place in the app where the steer
+  // angle has a known truth, so it is the only place the sensors can be
+  // graded -- worth recording even though nothing depends on it.
+  let ratio=null;
+  if(chk&&chk.L!=null&&casStops())ratio=chk.L/casStops().L.deg;
   const prev=S.sess.cas[cas.wheel];
   const entry={caster:r.caster,sai:r.sai,thL:r.thL,thR:r.thR,c0:r.c0,
-               nCap:r.n,rms:r.rms,fitSe:r.se,src:cas.src,pts:cas.pts.slice()};
+               nCap:r.n,rms:r.rms,fitSe:r.se,src:casCal()?"stops":cas.src,pts:cas.pts.slice(),
+               cal:casCal(),stopBad:chk?chk.bad.length:0,sensorRatio:ratio};
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
   cas.pts=[];cas.acc0=null;cas.testReport=null;   // run is stored; the log reads it back from there
   cas.phase=4;casUI();renderResults();
   const bad=r.rms>0.40;   // see lsqCaster: healthy runs sit near 0.16, p90 0.22
+  if(chk&&chk.bad.length){
+    const which=chk.bad.map(b=>b.n).join(", ");
+    toast("Capture "+which+" looks short of the stop — clear this wheel and re-run");
+    say("Warning. "+chk.bad.length+" capture"+(chk.bad.length>1?"s":"")+" looked short of the stop. Clear this wheel and run it again, making sure you hold it hard against the lock each time.");
+  }
   toast(`${cas.wheel} caster ${fmt(r.caster)}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
   say("Caster "+r.caster.toFixed(1)+" degrees, from "+(r.n-1)+" captures"+
       (r.se!=null?", give or take "+r.se.toFixed(2):"")+". "+
@@ -1842,6 +2044,47 @@ function casSensorReport(){
       ". Gyro saw "+Math.round(Math.abs(t.thG))+" degrees. I would use the "+t.src+
       ". Open captures from the last run to read the details.");
 }
+function calNum(id){const v=parseFloat($(id).value);return isFinite(v)?v:null;}
+function casCalPreview(){
+  const L=calNum("calLen"),opp=$("calSide").value==="opp";
+  const l=stopAngleFrom(calNum("calLF"),calNum("calLR"),L,opp);
+  const r=stopAngleFrom(calNum("calRF"),calNum("calRR"),L,opp);
+  const line=a=>a==null?"–":fmt(a,1)+"°";
+  const rows=["left stop   "+line(l),"right stop  "+line(r)];
+  if(l!=null&&r!=null){
+    const diff=Math.abs(l-r);
+    rows.push("");
+    rows.push("asymmetry   "+fmt(l-r,1)+"°"+(diff>12?"   <- unusually lopsided, re-check":"   (normal)"));
+  }
+  $("calPreview").textContent=rows.join(String.fromCharCode(10));
+  $("btnCalSave").disabled=!(l!=null&&r!=null);
+  return{l:l,r:r,L:L,opp:opp};
+}
+function casCalSave(){
+  const v=casCalPreview();
+  if(v.l==null||v.r==null){toast("Both stops need four good numbers");return;}
+  S.stops[S.veh]={
+    L:{deg:v.l,dF:calNum("calLF"),dR:calNum("calLR"),len:v.L,opp:v.opp,when:Date.now()},
+    R:{deg:v.r,dF:calNum("calRF"),dR:calNum("calRR"),len:v.L,opp:v.opp,when:Date.now()}
+  };
+  saveStops();casCalUI();casStepsUI();
+  toast("Stored: left "+fmt(v.l,1)+"°, right "+fmt(v.r,1)+"°");
+  say("Stop angles stored. Left "+Math.round(v.l)+" degrees, right "+Math.round(v.r)+" degrees.");
+}
+function casCalClear(){delete S.stops[S.veh];saveStops();casCalUI();casStepsUI();toast("Stop angles cleared");}
+function casCalUI(){
+  const st=S.stops[S.veh];
+  const el=$("casCalState");
+  if(el)el.innerHTML=st&&st.L&&st.R
+    ? "<b>Stored for "+prof().short+":</b> left "+fmt(st.L.deg,1)+"° · right "+fmt(st.R.deg,1)+"° · measured over "+(+st.L.len)+"″"
+    : "<b>Not measured yet for "+prof().short+".</b> The calibrated sweep can’t run until these are stored.";
+  if(st&&st.L){
+    $("calLen").value=st.L.len;$("calSide").value=st.L.opp?"opp":"same";
+    $("calLF").value=st.L.dF;$("calLR").value=st.L.dR;
+    $("calRF").value=st.R.dF;$("calRR").value=st.R.dR;
+  }else if(!$("calLen").value){$("calLen").value=S.barLen||48;}
+  casCalPreview();
+}
 function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
 // The raw captures, so a suspect result can be read back instead of guessed at.
 function casLogUI(){
@@ -1863,6 +2106,17 @@ function casLogUI(){
   el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
 }
 function casStepsUI(){
+  if(casCal()){
+    const st=casStops();
+    const tc=[
+      st?("Stops stored: <b>left "+fmt(st.L.deg,1)+"°, right "+fmt(st.R.deg,1)+"°</b>. Bar taped sideways on the wheel, wheels straight, tap a sweep button and <b>hold still</b> until it chirps — that is the centre camber.")
+         :("<b>Measure the stop angles first</b> — open “Steering-stop angles” above. Nothing here works until they are stored."),
+      "Steer <b>hard against one stop</b> and hold. It captures camber and uses the <b>stored</b> angle for that side — the phone is not measuring the angle at all any more, it only notices which way you went.",
+      "Alternate stops, <b>four to eight captures</b>, then press <b>Stop</b>. Hold hard against the lock every time: a capture taken short of the stop is the one thing this method can get wrong, and it will tell you if it spots one."
+    ];
+    for(let i=1;i<=3;i++){const el=$("cstep"+i);if(el)el.querySelector(".stept").innerHTML=tc[i-1];}
+    return;
+  }
   if(casCont()){
     const tc=[
       "Bar taped on the wheel, wheels straight. Tap a sweep button and <b>hold the bar still</b> until it chirps — that is the centre reading. Then walk to the cab.",
@@ -1897,7 +2151,8 @@ function casUI(){
     const q=fit?(fit.rms<0.22?"captures agree well":fit.rms<0.40?"captures agree":"captures disagree — something moved, re-run")
               :(m.sd==null?"sweep again":(m.sd<0.25?"good":m.sd<0.6?"fair":"scattered — re-seat and repeat"));
     $("cas"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+" · "+q+
-      (fit?"<br>"+(fit.nCap-1)+" captures · misfit ±"+fit.rms.toFixed(2)+"°"+(fit.fitSe!=null?" · fit ±"+fit.fitSe.toFixed(2)+"°":"")+" · "+(fit.src||"?"):"")+
+      (fit?"<br>"+(fit.nCap-1)+" captures · misfit ±"+fit.rms.toFixed(2)+"°"+(fit.fitSe!=null?" · fit ±"+fit.fitSe.toFixed(2)+"°":"")+
+           " · "+(fit.cal?"angle from tape":(fit.src||"?"))+(fit.stopBad?" · <b>"+fit.stopBad+" short of the stop</b>":""):"")+
       "<br>"+(last?"swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
   }
   const b=$("btnCasAbort");
@@ -2227,7 +2482,9 @@ function tick(){
       // on the very sensor it is there to check -- either one moving counts.
       const far=cas.test
         ? (Math.abs(tAng.thG)>=CAS_MIN||(tAng.thC!=null&&Math.abs(tAng.thC)>=CAS_MIN))
-        : (Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN);
+        : casCal()
+          ? Math.abs(psi)>=casGate()          // either way: the SENSOR's sign decides the side
+          : (Math.sign(psi)===dir&&Math.abs(psi)>=CAS_MIN);
       const grab=()=>{cas._busy=true;casterGrab(dir>0?"L":"R").finally(()=>cas._busy=false);};
       if(S.sweepMode==="deg"){
         const tgt=dir*cas.target;
@@ -2242,6 +2499,7 @@ function tick(){
         // whatever angle that turns out to be is the angle the maths uses.
         const nCap=cas.pts.length-1;
         $("roCasB").textContent=cas.test?(far?"got it — hold still":"steer either way and hold")
+          :casCal()?(far?"at a stop? hold still":nCap+" captured · steer to the "+(dir>0?"LEFT":"RIGHT")+" stop")
           :far?"far enough — stop and hold"
           :(casCont()?(nCap+" captured · steer "+(dir>0?"LEFT":"RIGHT")):"steer "+(dir>0?"LEFT":"RIGHT")+" to the stop");
         drawBubble($("bubCas"),psi,{span:45});
@@ -2317,6 +2575,11 @@ $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casStopBtn);
 $("btnCasSens").addEventListener("click",casSensorStart);
+$("btnCalSave").addEventListener("click",casCalSave);
+$("btnCalClear").addEventListener("click",casCalClear);
+["calLen","calLF","calLR","calRF","calRR"].forEach(id=>$(id).addEventListener("input",casCalPreview));
+$("calSide").addEventListener("change",casCalPreview);
+casCalUI();
 $("sweepMode").value=S.sweepMode;
 $("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();});
 casStepsUI();
