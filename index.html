@@ -1969,7 +1969,33 @@ function finishCasterFit(){
       cas.run=true;sensor.yawRun=true;cas.phase=3;casUI();return;
     }
   }
-  const r=lsqCaster(used);
+  /* The two front wheels do NOT share a camber-vs-steer sign.
+
+     The phone sits on the OUTBOARD face of each wheel, so its screen normal
+     n points at -Y on the left wheel and +Y on the right. Rotating n about
+     the steering axis a, the caster term carries (a x n)_z = a_x*n_y, which
+     FLIPS with n_y -- while the SAI term carries a.n, in which BOTH a_y and
+     n_y flip, so it does not. Net: camber = c0 +C*sin(th) ... on the left and
+     c0 -C*sin(th) ... on the right, for one and the same truck.
+
+     Derived from scratch and checked against the one cornering fact nobody
+     disputes: with positive caster the INSIDE wheel of a turn gains positive
+     camber and the OUTSIDE wheel gains negative. Left turn, +10 deg: LF reads
+     +0.83 (leans out, inside) and RF reads -0.56 (leans in, outside). Fed
+     through this very solver, a symmetric +4.0 degree truck returns +3.998 on
+     LF and -3.998 on RF.
+
+     Negating theta on the right-hand wheel maps its curve onto the left-hand
+     form exactly, because sin is odd and cos is even. The stored points keep
+     the PHYSICAL angle so the log and the swing readout stay honest about
+     which way he actually turned; only the fit sees the flipped copy. */
+  const sideFlip=(cas.wheel&&cas.wheel.charAt(0)==="R")?-1:1;
+  const fitPts=sideFlip===1?used:used.map(q=>Object.assign({},q,{th:-q.th}));
+  const r=lsqCaster(fitPts);
+  if(r&&sideFlip===-1){   // report the swing as he drove it, not as the fit saw it
+    const ext=used.map(q=>q.th);
+    r.thL=Math.max.apply(null,ext);r.thR=Math.min.apply(null,ext);
+  }
   if(!r){
     const m=casCal()?"Couldn't solve — need captures at both stops":"Couldn't solve — captures too alike, vary the steering amounts";
     toast(m);say(casCal()?"Could not solve that. I need captures at both stops.":"Could not solve that. The captures were too alike. Vary how far you turn.");
