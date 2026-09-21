@@ -866,7 +866,10 @@ function casTheta(){
   if(sensor.hasCompass&&cas.acc0!=null)thC=-(sensor.compassAcc-cas.acc0);
   // Three ways to disbelieve the compass, in order of how badly it lies:
   const geomOk=cas.mount!=="portrait";        // degenerate geometry -- see above
-  const accOk=sensor.compassAccuracy==null||sensor.compassAccuracy<=25;
+  // iOS reports a NEGATIVE webkitCompassAccuracy to mean "this heading is
+  // invalid" -- and -1 <= 25 is true, so the one value the OS uses to say the
+  // compass is garbage was being read as better than a perfect compass.
+  const accOk=sensor.compassAccuracy==null||(sensor.compassAccuracy>=0&&sensor.compassAccuracy<=25);
   // ...and a compass sitting still while the gyro says the wheel plainly
   // moved is the degeneracy showing itself whatever the mount looked like.
   const alive=thC!=null&&!(Math.abs(thC)<3&&Math.abs(thG)>3);
