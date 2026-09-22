@@ -387,15 +387,38 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="orient" id="orientCas"><i></i><span id="orientCasTxt">plumb –</span></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="handCard">
+      <div id="handStepNow" class="note" style="margin-bottom:10px">Pick a wheel to start.</div>
+      <div id="handRunning" style="display:none">
+        <button class="btn big primary" id="btnHandCap" style="width:100%">Capture</button>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn ghost" id="btnHandUndo">Undo last</button>
+          <button class="btn ghost" id="btnHandStop">Stop</button>
+        </div>
+        <div id="handProgress" class="small mono" style="margin-top:8px"></div>
+      </div>
+      <div id="handIdle">
+        <div class="btnrow">
+          <button class="btn primary" id="btnHandLF">Start LF</button>
+          <button class="btn primary" id="btnHandRF">Start RF</button>
+          <button class="btn ghost" id="btnHandVoice">Voice: on</button>
+        </div>
+      </div>
+      <div class="wheels" style="margin-top:12px">
+        <div class="wtile"><div class="wname">LF caster</div><div class="wval mono" id="casLFv">–</div><div class="wsub" id="casLFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="LF">clear</button></div>
+        <div class="wtile"><div class="wname">RF caster</div><div class="wval mono" id="casRFv">–</div><div class="wsub" id="casRFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="RF">clear</button></div>
+      </div>
+    </div>
+
+    <details class="card" id="casOldCard"><summary>Other sweep modes, stop-angle tape calibration, sensor check</summary><div class="dbody">
       <h2>Steering sweep</h2>
       <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing and grabs camber by itself each time you hold still.</p>
       <p class="hint"><b>Keep sweeping until you press Stop, and vary how far you turn.</b> Every hold is another data point, and the app fits caster and SAI to all of them at once. Eight captures cut the scatter to about 0.15° where a single lock-to-lock pair gives 0.26°, and because there are then more readings than unknowns the fit also reports a <b>misfit</b> — how well the captures agree with each other. A single pair has no spare readings, so it fits perfectly no matter how wrong it is and can never warn you about anything.</p>
       <p class="hint"><b>What misfit catches:</b> the bar shifting on the wheel, tape letting go, one fumbled capture. Under <b>0.22°</b> is healthy, over <b>0.40°</b> means something moved — re-tape and run it again. What it does <i>not</i> catch is a wrongly scaled steer angle: that error hides inside the fit almost perfectly, which is why the angle now comes from the compass instead of a learned gyro scale, and why a compass/gyro disagreement is announced out loud rather than left to the misfit to notice.</p>
-      <p class="hint"><b>Mount the phone on the straight edge once and leave it there.</b> Two captures at each of three steering positions — straight, left, right. Bar <b>across the wheel, flat, screen up</b> for the heading; then stand the same bar <b>up and down on the wheel face, phone top up, screen out</b> for the camber. Only the bar turns. <b>15–30°</b> of steer is plenty.</p>
+      <p class="hint"><b>Mount the phone on the straight edge once and leave it there.</b> Two captures at each of three steering positions — straight, left, right. Bar <b>across the wheel, flat, screen up</b> for the heading; then stand the same bar <b>up and down on the wheel face, phone top up, screen out</b> for the camber. Only the bar turns. Turn the wheel <b>as far as it will go</b>.</p>
       <p class="hint"><b>The bar beats the bare phone at both jobs.</b> Across the wheel it rests on the rim front and rear, so it takes the wheel’s direction from two points instead of one short edge that can sit skew. Stood on the face it spans the rim top and bottom rather than rocking on the curve. Standing it up puts the phone upright for the camber capture, which changes nothing: camber is gravity along the <i>screen normal</i>, and rolling the phone about that normal cannot alter it — there is an assertion holding that to 1e-9. The old sideways-only rule existed purely so the compass could work in the taped mount; the heading is read flat now, so it is gone.</p>
       <p class="hint"><b>Why flat matters, and why the taped sweep failed.</b> A compass heading is built from the two <i>horizontal</i> magnetometer axes. Taped to the wheel face, the phone’s screen-normal axis is horizontal and aimed <b>straight through the cast-iron brake rotor</b> — so the one axis pointed at the biggest lump of iron on the truck fed the answer one-for-one. Lay the phone flat and that axis becomes <i>vertical</i>, excluded from the heading entirely. Tilt it by 2° and only 3.5% leaks back; at 20° it is 34%. That is why the capture refuses to fire until you are inside 2° of level — the gate is doing the actual work. Holding it at the rim edge also puts it several inches further from the rotor, and the field falls off as 1/r³.</p>
-      <p class="hint"><b>Two rules.</b> Keep the top of the phone pointing at the bumper the whole time — <b>never turn it end-for-end</b>; a flip reads as a 180° steer and the run is refused rather than quietly halved. And a small sweep is genuinely better: 15–30° scrubs the tyre far less against the floor, which is the other thing that was corrupting the taped runs. At 20°, one degree of heading error costs 0.19° of caster.</p>
+      <p class="hint"><b>Two rules.</b> On the <b>heading</b> leg keep the top of the bar pointing at the bumper — <b>never end-for-end</b>; a flip reads as a 180° steer and the run is refused rather than quietly halved. And <b>turn as far as the wheel will go</b>: the cost of a sloppy heading is caster×cot(θ), so it <i>shrinks</i> with angle — 0.26° of caster per degree at 15°, 0.19° at 20°, 0.12° at 30°, 0.08° at 45°.</p>
       <p class="hint"><b>The tape-measured stop angles</b> (below) are still there as a backup, and the sensor sweeps still work if you want them.</p>
       <p class="hint" style="opacity:.75"><b>Tape method:</b> the steer angle comes off a tape measure — no sensor involved.</p>
       <p class="hint" style="opacity:.75"><b>(taped sweep, kept for reference)</b> Measure your two steering locks once (below), and every sweep after that uses those stored numbers. This is how an alignment rack does it: the angle is read from a mechanical protractor in the turnplate, never from a sensor riding on the wheel. Your steering stops are a better reference than a turnplate anyway — metal on metal, the same angle every single time, and you can feel them without looking.</p>
@@ -457,10 +480,6 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <div class="step" id="cstep1"><div class="stepn">1</div><div class="stept"></div></div>
         <div class="step" id="cstep2"><div class="stepn">2</div><div class="stept"></div></div>
         <div class="step" id="cstep3"><div class="stepn">3</div><div class="stept"></div></div>
-      </div>
-      <div class="wheels" style="margin-top:12px">
-        <div class="wtile"><div class="wname">LF caster</div><div class="wval mono" id="casLFv">–</div><div class="wsub" id="casLFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="LF">clear</button></div>
-        <div class="wtile"><div class="wname">RF caster</div><div class="wval mono" id="casRFv">–</div><div class="wsub" id="casRFs"></div><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-casclr="RF">clear</button></div>
       </div>
       <details><summary>Tires won’t turn far, or the reading looks wrong?</summary><div class="dbody">
         <b>Any swing past ±8° is a valid sweep.</b> If the tires won’t pivot far enough to reach the stops — not slippery enough, or the brake creeping — just steer as far as they will go, stop, and hold. It captures wherever you stopped and uses that exact angle. A small swing isn’t wrong, only noisier: at ±8° expect roughly twice the scatter of ±15°, so take more sweeps to make up for it.
@@ -2219,10 +2238,16 @@ function casCalUI(){
        are taken on the raw 0-360 reading by shortest path, so a 180 degree
        flip would read as a 180 degree steer and is rejected rather than
        silently halved.
-     - 15 to 30 degrees is plenty. Small sweeps also mean far less tyre scrub
-       against the floor, which is the other thing corrupting the taped runs. */
+     - turn as far as the wheel will go. dCaster/dHeading = caster*cot(theta),
+       so the penalty for a sloppy heading SHRINKS with angle. */
 const HAND_LEVEL_TOL=2.0;         // degrees off level allowed on a heading capture
-const HAND_MIN=12,HAND_MAX=45;    // sane steer angles for a caster sweep
+/* FURTHER IS BETTER, and the old 30-degree advice had it backwards.
+   dCaster/dHeading = caster * cot(theta), so the penalty for a sloppy heading
+   SHRINKS as the steer angle grows: 0.26 deg of caster per degree at 15,
+   0.19 at 20, 0.12 at 30, 0.08 at 45. Turn as far as the wheel will go.
+   The cap that remains exists only to catch the phone being turned
+   end-for-end, which reads as 180. */
+const HAND_MIN=12,HAND_MAX=75;
 const HAND_POS=["STRAIGHT AHEAD","LEFT","RIGHT"];
 const hand={run:false,wheel:null,pos:0,leg:0,data:null,busy:false};
 
@@ -2254,6 +2279,47 @@ function handTheta(hdg0,hdg){
 }
 function handActive(){return S.sweepMode==="hand";}
 
+const NLCH=String.fromCharCode(10);
+function handUI(){
+  const idle=$("handIdle"),run=$("handRunning"),st=$("handStepNow");
+  if(!st)return;
+  if(idle)idle.style.display=hand.run?"none":"";
+  if(run)run.style.display=hand.run?"":"none";
+  if(!hand.run){
+    st.innerHTML=handActive()
+      ? "Pick a wheel. <b>Six captures</b>: heading + camber at straight, left and right. Turn the wheel <b>as far as it will go</b> — further is better."
+      : "Hand-held sequence is not the selected mode — pick it in the list below.";
+    return;
+  }
+  st.innerHTML=hand.leg===0
+    ? "<b>"+HAND_POS[hand.pos]+" · HEADING</b><br>Bar <b>flat ACROSS</b> the wheel · <b>screen UP</b> · top at the <b>BUMPER</b>. Get it level, then Capture."
+    : "<b>"+HAND_POS[hand.pos]+" · CAMBER</b><br>Bar <b>UP AND DOWN</b> on the wheel face · <b>top UP</b> · <b>screen OUT</b>. Then Capture.";
+  const rows=[];
+  for(let i=0;i<3;i++){
+    const d=(hand.data&&hand.data[i])||{};
+    rows.push(HAND_POS[i].padEnd(9)+
+      (d.hdg!=null?("hdg "+d.hdg.toFixed(1)).padStart(11):"hdg    –".padStart(11))+
+      (d.camb!=null?("  camb "+fmt(d.camb,2)).padStart(13):"  camb    –".padStart(13)));
+  }
+  const done=hand.pos*2+hand.leg;
+  $("handProgress").textContent=rows.join(NLCH)+NLCH+done+" of 6 captured";
+}
+function handCapture(){
+  if(!hand.run||hand.busy)return;
+  hand.busy=true;
+  handGrab().finally(()=>{hand.busy=false;handUI();});
+}
+function handUndo(){
+  if(!hand.run){toast("Not running");return;}
+  if(hand.leg===1){
+    const d=hand.data[hand.pos];delete d.hdg;delete d.lvl;delete d.acc;
+    hand.leg=0;toast("Heading capture undone");
+  }else if(hand.pos>0){
+    hand.pos--;hand.leg=1;delete hand.data[hand.pos].camb;
+    toast("Camber capture undone");
+  }else{toast("Nothing to undo yet");return;}
+  handUI();casUI();
+}
 function handStart(wheel){
   if(!sensor.on){toast("Turn the sensors on first");return;}
   if(!sensor.hasCompass){
@@ -2266,7 +2332,7 @@ function handStart(wheel){
   cas.run=false;cas.wheel=wheel;
   keepAwake(true);
   $("casMode").textContent="Hand-held \u00b7 "+wheel;
-  casUI();
+  casUI();handUI();
   say("Hand held sequence on the "+(wheel==="LF"?"left":"right")+" front. Wheels straight ahead. "+
       "Lay the phone flat on the rim, screen up, top pointing at the bumper, and hold it level.");
   toast("Straight ahead \u2014 phone FLAT on the rim, screen up");
@@ -2275,7 +2341,7 @@ function handAbort(){
   hand.run=false;hand.busy=false;hand.data=null;
   keepAwake(false);hush();
   $("casMode").textContent="Caster sweep";
-  casUI();
+  casUI();handUI();
 }
 async function handGrab(){
   const s=await sample(900);
@@ -2287,20 +2353,21 @@ async function handGrab(){
     hand.leg=1;
     flash();beep(1180,0.09);
     const th=hand.pos===0?0:handTheta(hand.data[0].hdg,d.hdg);
-    toast(HAND_POS[hand.pos]+" heading caught"+(hand.pos?" \u00b7 "+fmt(th,1)+"\u00b0 of steer":"")+
-          " \u2014 now against the wheel FACE");
-    say("Heading caught"+(hand.pos?", "+Math.round(Math.abs(th))+" degrees":"")+
-        ". Now hold it against the wheel face, screen facing out, top toward the bumper.");
+    if(d.lvl>HAND_LEVEL_TOL)
+      toast("Caught, but "+fmt(d.lvl,1)+"\u00b0 off level \u2014 that leaks rotor iron into the heading");
+    else
+      toast(HAND_POS[hand.pos]+" heading"+(hand.pos?" \u00b7 "+fmt(th,1)+"\u00b0 of steer":"")+" \u2014 now CAMBER");
+    say("Heading caught"+(hand.pos?", "+Math.round(Math.abs(th))+" degrees":"")+". Now camber.");
   }else{
     d.camb=(S.camSign[hand.wheel]||1)*tiltZ(s.g);
     hand.leg=0;hand.pos++;
     flash();beep(1320,0.09);
     if(hand.pos>2){handFinish();return;}
-    toast("Camber "+fmt(d.camb)+"\u00b0 \u2014 now steer "+HAND_POS[hand.pos]+" 15 to 30\u00b0");
+    toast("Camber "+fmt(d.camb)+"\u00b0 \u2014 now steer "+HAND_POS[hand.pos]+", as far as it goes");
     say("Camber "+fmt(d.camb,1)+" degrees. Now steer "+HAND_POS[hand.pos].toLowerCase()+
-        ", fifteen to thirty degrees, then lay the phone flat on the rim again.");
+        " as far as it will go, then lay the bar flat across the wheel again.");
   }
-  casUI();
+  casUI();handUI();
 }
 function handFinish(){
   hand.run=false;keepAwake(false);hush();
@@ -2365,7 +2432,7 @@ function casLogUI(){
 function casStepsUI(){
   if(handActive()){
     const th=[
-      "<b>Mount the phone on the straight edge once and leave it there.</b> Wheels straight, then two captures at each of three steering positions — straight, left, right. <b>15 to 30°</b> of steer is plenty; more just scrubs the tyre against the floor for no gain.",
+      "<b>Mount the phone on the straight edge once and leave it there.</b> Wheels straight, then two captures at each of three steering positions — straight, left, right. Turn the wheel <b>as far as it will go</b> &mdash; further is better, not worse: the penalty for a sloppy heading shrinks as the angle grows.",
       "<b>Heading:</b> bar laid <b>ACROSS the wheel, flat and level, screen UP, top toward the bumper</b> — resting on the rim front and rear so it lines up with the wheel. It will not capture until you are inside "+HAND_LEVEL_TOL+"° of level, and that gate is doing real work.",
       "<b>Camber:</b> stand the same bar <b>UP AND DOWN against the wheel face</b> — phone <b>TOP UP, screen facing OUT</b>, away from the truck. Only the bar turns; the phone never moves on it. Then steer to the next position and repeat.<br><b>On the heading leg only:</b> the top must point at the bumper, never away — end-for-end reads as a 180° steer and the run is refused. On this camber leg the top just points at the sky and which way round it sits makes no difference."
     ];
@@ -2705,9 +2772,10 @@ async function keepAwake(){
 
 /* ---------- live loop ---------- */
 let activeScr="setup";
-function setOrient(elId,txtId,errDeg,label){
+function setOrient(elId,txtId,errDeg,label,tol){
   const el=$(elId);
-  const cls=Math.abs(errDeg)<3?"good":Math.abs(errDeg)<8?"warn":"bad";
+  const t=tol||3;
+  const cls=Math.abs(errDeg)<t?"good":Math.abs(errDeg)<t*2.7?"warn":"bad";
   el.classList.remove("good","warn","bad");el.classList.add(cls);
   $(txtId).textContent=label+" "+fmt(errDeg,1)+"°"+(cls==="good"?" ✓":"");
 }
@@ -2731,33 +2799,43 @@ function tick(){
   }
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
-    setOrient("orientCas","orientCasTxt",casRollError(sensor.g),"plumb");
     if(hand.run){
+      /* THE PLUMB BUG. The two legs hold the phone in completely different
+         attitudes, so they cannot share one indicator -- which is exactly
+         what was happening, and why it read nonsense.
+
+         Heading leg: the phone lies FLAT, so g is (0,0,-1) and BOTH g[0] and
+         g[1] are ~0. casRollError() reads g[0], so it showed a dead zero (or
+         a frozen -rollZero) no matter how badly the bar was tilted. What
+         matters here is tilt away from HORIZONTAL, in both axes at once:
+         handLevelErr() = asin(hypot(g[0],g[1])).
+
+         Camber leg: the phone is PORTRAIT, gravity runs down g[1], and the
+         thing to watch is twist about the screen normal -- which IS g[0],
+         i.e. the ordinary roll indicator with its calibrated zero. */
       const g=sensor.g;
-      const held=sensor.stillSince?performance.now()-sensor.stillSince:0;
       $("roCas").classList.remove("dead");
       if(hand.leg===0){
-        // Heading leg. The level gate is the whole point: tilt the phone and
-        // the rotor-facing Z axis starts leaking back into the heading.
-        const lvl=handLevelErr(g),okFlat=handFlatOk(g);
+        const lvl=handLevelErr(g);
         $("roCas").innerHTML=fmt(lvl,1)+'<span class="u">° off level</span>';
-        $("roCasA").textContent=HAND_POS[hand.pos]+" · bar ACROSS the wheel, flat, screen UP, top to the bumper";
-        $("roCasB").textContent=(g[2]>=-0.85)?"lay the bar flat across the wheel, screen UP"
-          :!okFlat?("level it — "+fmt(lvl,1)+"° off, needs under "+HAND_LEVEL_TOL+"°")
-          :(held>1000?"holding…":"hold still");
         drawBubble($("bubCas"),lvl,{span:6,target:0,tol:HAND_LEVEL_TOL});
-        if(!hand.busy&&okFlat&&held>1000){hand.busy=true;handGrab().finally(()=>{hand.busy=false;});}
+        setOrient("orientCas","orientCasTxt",lvl,"level",HAND_LEVEL_TOL);
+        $("roCasA").textContent="heading "+(sensor.compassHeading==null?"–":Math.round(sensor.compassHeading)+"°");
+        $("roCasB").textContent=(g[2]>=-0.85)?"lay the bar FLAT, screen UP"
+          :handFlatOk(g)?"level — capture it":"level it first";
       }else{
-        const camb=(S.camSign[hand.wheel]||1)*tiltZ(g),okFace=handFaceOk(g);
+        const camb=(S.camSign[hand.wheel]||1)*tiltZ(g);
         $("roCas").innerHTML=fmt(camb)+'<span class="u">° camber</span>';
-        $("roCasA").textContent=HAND_POS[hand.pos]+" · bar UP AND DOWN on the wheel face · top UP, screen OUT";
-        $("roCasB").textContent=!okFace?"stand the bar up against the wheel face"
-          :(held>1000?"holding…":"hold still");
         drawBubble($("bubCas"),camb,{span:6});
-        if(!hand.busy&&okFace&&held>1000){hand.busy=true;handGrab().finally(()=>{hand.busy=false;});}
+        setOrient("orientCas","orientCasTxt",liveRollError(g),"plumb");
+        $("roCasA").textContent="bar upright on the wheel face";
+        $("roCasB").textContent=handFaceOk(g)?"ready — capture it":"stand the bar UP";
       }
+      handUI();
     }else if(cas.run&&cas.phase>=2){
-      const tAng=casTheta();
+      setOrient("orientCas","orientCasTxt",casRollError(sensor.g),"plumb");
+      const tAng2=casTheta();
+      const tAng=tAng2;
       const psi=tAng.th;
       $("roCas").classList.remove("dead");
       $("roCas").innerHTML=fmt(psi,1)+'<span class="u">°</span>';
@@ -2871,9 +2949,27 @@ $("btnCalClear").addEventListener("click",casCalClear);
 $("calSide").addEventListener("change",casCalPreview);
 casCalUI();
 $("sweepMode").value=S.sweepMode;
-$("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();});
+$("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();handModeUI();});
+$("btnHandCap").addEventListener("click",handCapture);
+$("btnHandUndo").addEventListener("click",handUndo);
+$("btnHandStop").addEventListener("click",()=>{handAbort();toast("Stopped");});
+$("btnHandLF").addEventListener("click",()=>handStart("LF"));
+$("btnHandRF").addEventListener("click",()=>handStart("RF"));
+$("btnHandVoice").addEventListener("click",()=>{S.voiceOn=!S.voiceOn;store.set("voiceOn",S.voiceOn);casVoiceUI();if(!S.voiceOn)hush();});
+// The compact card IS the hand-held mode; in any other mode it would be a
+// dead panel sitting above the controls that actually apply.
+function handModeUI(){
+  const c=$("handCard"),o=$("casOldCard");
+  if(c)c.style.display=handActive()?"":"none";
+  if(o&&handActive())o.open=false;
+  handUI();
+}
+handModeUI();
 casStepsUI();
-function casVoiceUI(){$("btnCasVoice").textContent="Voice: "+(S.voiceOn?"on":"off");}
+function casVoiceUI(){
+  $("btnCasVoice").textContent="Voice: "+(S.voiceOn?"on":"off");
+  const h=$("btnHandVoice");if(h)h.textContent="Voice: "+(S.voiceOn?"on":"off");
+}
 $("btnCasVoice").addEventListener("click",()=>{
   S.voiceOn=!S.voiceOn;store.set("voiceOn",S.voiceOn);casVoiceUI();
   if(S.voiceOn)say("Voice on.");else hush();
