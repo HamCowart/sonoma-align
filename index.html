@@ -268,7 +268,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <h2>3 · Zero the gauge</h2>
       <p class="hint">Cancels the small built-in lean of your phone and the gauge bar. Do this <b>once each time you mount the phone</b> in the bar. Hold the bar on any wheel, upright (feet at 12 and 6 o’clock), and follow the three captures.</p>
       <div class="steps" style="margin-top:10px" id="zeroSteps">
-        <div class="step" id="zstep1"><div class="stepn">1</div><div class="stept">Bar on wheel, <b>screen facing you</b> — hold still, it captures itself.</div></div>
+        <div class="step" id="zstep1"><div class="stepn">1</div><div class="stept">Bar upright on the wheel (feet 12 and 6), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Hold still, it captures itself.</div></div>
         <div class="step" id="zstep2"><div class="stepn">2</div><div class="stept">Flip the <b>bar end-for-end</b> (top foot to bottom), screen still facing you — hold.</div></div>
         <div class="step" id="zstep3"><div class="stepn">3</div><div class="stept">Bar back to normal, but <b>phone screen toward the wheel</b> — 6-second countdown, captures with a beep.</div></div>
       </div>
@@ -356,7 +356,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
-      <p class="hint">Bar upright on the wheel lip (feet at 12 and 6), screen facing you. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
+      <p class="hint"><b>Phone placement:</b> bar <b>upright</b> on the wheel lip (feet at 12 and 6 o’clock), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Same hold as the camber leg of a caster run, so nothing has to move between them. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
       <p class="hint"><b>Take three or four readings per wheel, lifting the phone off the bar and re-seating it between each one.</b> Every tap adds a reading rather than replacing the last, and the tile shows the average, how far the readings scattered, and how tight that average is. Holding the phone by hand means each placement sits a little differently — that scatter is the real error here, and one reading can never show it to you. Tapping again <i>without</i> re-seating measures nothing new.</p>
       <div class="wheels" style="margin-top:10px">
         <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LF">clear</button></div>
@@ -492,7 +492,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <div class="spread"><h2>Gyro toe</h2><span class="pill na">±0.05–0.15°</span></div>
-      <p class="hint">Bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>top of phone toward the front bumper on every wheel</b>. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
+      <p class="hint"><b>Phone placement:</b> bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>screen facing OUT</b> — away from the truck — and <b>top of phone toward the front bumper on every wheel</b>. Screen direction is not fussy here the way it is elsewhere: this carry runs on the <b>gyro</b>, which is blind to magnets and to how the phone is rolled, so only the two feet on the rim and the top pointing forward actually set the reading. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn" id="btnToeModeF">Front only</button>
         <button class="btn sel" id="btnToeModeA">All 4 wheels</button>
@@ -624,6 +624,30 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     </div>
 
     <div class="card">
+      <h2>Phone placement, every capture</h2>
+      <p class="hint">Each reading uses a different axis of the phone, so each one wants the phone held a particular way. Three things fix a hold: <b>what it rests on</b>, <b>which way the screen faces</b>, and <b>which way the top points</b>. Anything not listed genuinely does not matter.</p>
+      <div style="overflow-x:auto;margin-top:8px">
+      <table class="rt" style="min-width:560px">
+        <thead><tr><th>Capture</th><th>Rests on</th><th>Screen</th><th>Top of phone</th></tr></thead>
+        <tbody>
+          <tr><td><b>Flat check</b></td><td>a table, lying flat</td><td>UP</td><td>spin it a quarter turn, stays flat</td></tr>
+          <tr><td><b>Gauge zero</b> 1</td><td>bar upright on wheel, feet 12 &amp; 6</td><td>OUT</td><td>UP</td></tr>
+          <tr><td><b>Gauge zero</b> 2</td><td>same, bar flipped end-for-end</td><td>OUT</td><td>DOWN</td></tr>
+          <tr><td><b>Gauge zero</b> 3</td><td>bar back to normal</td><td><b>toward the wheel</b></td><td>UP</td></tr>
+          <tr><td><b>Floor</b> 1</td><td>bar across the truck, blocks down</td><td>UP</td><td>passenger side</td></tr>
+          <tr><td><b>Floor</b> 2</td><td>same, bar flipped end-for-end</td><td>UP</td><td>driver side</td></tr>
+          <tr><td><b>Camber</b></td><td>bar upright on wheel, feet 12 &amp; 6</td><td>OUT</td><td>UP</td></tr>
+          <tr><td><b>Caster</b> · heading leg</td><td>bar flat ACROSS the wheel, level</td><td>UP</td><td><b>bumper</b></td></tr>
+          <tr><td><b>Caster</b> · camber leg</td><td>bar upright on the wheel face</td><td>OUT</td><td>UP</td></tr>
+          <tr><td><b>Toe</b> · at each wheel</td><td>bar horizontal on wheel, feet 3 &amp; 9</td><td>OUT</td><td><b>bumper</b>, every wheel</td></tr>
+          <tr><td><b>Toe</b> · at a frame rail</td><td>bare phone flat on the rail face</td><td>UP</td><td>truck front</td></tr>
+          <tr><td><b>Caster</b> · taped modes</td><td>taped to the wheel face, sideways</td><td>OUT</td><td><b>bumper</b></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="hint" style="margin-top:8px"><b>Why the screen direction keeps changing.</b> Camber is gravity along the <b>screen normal</b>, so that axis has to point out through the wheel — and rolling the phone about it changes nothing, which is why camber never cares whether the top is up or sideways. A compass heading is built from the two <b>horizontal</b> axes, so the phone has to lie <b>flat</b>: that puts the screen-normal axis vertical and out of the answer, which matters because on a wheel it is aimed straight through the cast-iron brake rotor. Tilt it 2° and 3.5% of that iron leaks back into the heading; hold it against the wheel face and you get 100% of it. The gyro is the odd one out — blind to magnets and to roll — so the toe carry only cares where the feet sit and which way the top points.</p>
+      <p class="hint"><b>The two that look wrong but are not.</b> Gauge zero step 3 turns the screen <i>toward</i> the wheel on purpose: flipping it is how the routine separates your phone’s built-in lean from the bar’s. And the caster heading leg is the only capture where turning the phone end-for-end matters — it reads as a 180° steer and the run is refused. Everywhere else, which way round it sits is free.</p>
+
       <h2>Day-of checklist</h2>
       <ul>
         <li>Tires at equal, correct pressure. Normal load in the vehicle.</li>
