@@ -392,7 +392,12 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing and grabs camber by itself each time you hold still.</p>
       <p class="hint"><b>Keep sweeping until you press Stop, and vary how far you turn.</b> Every hold is another data point, and the app fits caster and SAI to all of them at once. Eight captures cut the scatter to about 0.15° where a single lock-to-lock pair gives 0.26°, and because there are then more readings than unknowns the fit also reports a <b>misfit</b> — how well the captures agree with each other. A single pair has no spare readings, so it fits perfectly no matter how wrong it is and can never warn you about anything.</p>
       <p class="hint"><b>What misfit catches:</b> the bar shifting on the wheel, tape letting go, one fumbled capture. Under <b>0.22°</b> is healthy, over <b>0.40°</b> means something moved — re-tape and run it again. What it does <i>not</i> catch is a wrongly scaled steer angle: that error hides inside the fit almost perfectly, which is why the angle now comes from the compass instead of a learned gyro scale, and why a compass/gyro disagreement is announced out loud rather than left to the misfit to notice.</p>
-      <p class="hint"><b>The steer angle comes off a tape measure now — no sensor involved.</b> Measure your two steering locks once (below), and every sweep after that uses those stored numbers. This is how an alignment rack does it: the angle is read from a mechanical protractor in the turnplate, never from a sensor riding on the wheel. Your steering stops are a better reference than a turnplate anyway — metal on metal, the same angle every single time, and you can feel them without looking.</p>
+      <p class="hint"><b>Nothing gets taped to the wheel any more.</b> Two captures at each of three steering positions — straight, left, right. Lay the phone <b>flat on the rim, screen up</b> for the heading, then turn it <b>onto the wheel face, screen out</b> for the camber. <b>15–30°</b> of steer is plenty.</p>
+      <p class="hint"><b>Why flat matters, and why the taped sweep failed.</b> A compass heading is built from the two <i>horizontal</i> magnetometer axes. Taped to the wheel face, the phone’s screen-normal axis is horizontal and aimed <b>straight through the cast-iron brake rotor</b> — so the one axis pointed at the biggest lump of iron on the truck fed the answer one-for-one. Lay the phone flat and that axis becomes <i>vertical</i>, excluded from the heading entirely. Tilt it by 2° and only 3.5% leaks back; at 20° it is 34%. That is why the capture refuses to fire until you are inside 2° of level — the gate is doing the actual work. Holding it at the rim edge also puts it several inches further from the rotor, and the field falls off as 1/r³.</p>
+      <p class="hint"><b>Two rules.</b> Keep the top of the phone pointing at the bumper the whole time — <b>never turn it end-for-end</b>; a flip reads as a 180° steer and the run is refused rather than quietly halved. And a small sweep is genuinely better: 15–30° scrubs the tyre far less against the floor, which is the other thing that was corrupting the taped runs. At 20°, one degree of heading error costs 0.19° of caster.</p>
+      <p class="hint"><b>The tape-measured stop angles</b> (below) are still there as a backup, and the sensor sweeps still work if you want them.</p>
+      <p class="hint" style="opacity:.75"><b>Tape method:</b> the steer angle comes off a tape measure — no sensor involved.</p>
+      <p class="hint" style="opacity:.75"><b>(taped sweep, kept for reference)</b> Measure your two steering locks once (below), and every sweep after that uses those stored numbers. This is how an alignment rack does it: the angle is read from a mechanical protractor in the turnplate, never from a sensor riding on the wheel. Your steering stops are a better reference than a turnplate anyway — metal on metal, the same angle every single time, and you can feel them without looking.</p>
       <p class="hint"><b>Why the phone can’t do it.</b> Two honest attempts both failed on the truck. The gyro needs a learned scale factor that can be stale or reset — that was the 14° reading. The compass fails worse and less obviously: the phone is taped to a <b>steel wheel with a cast-iron brake rotor right behind it</b>, and that iron turns <i>with</i> the phone, so its magnetic pull sits fixed in the phone’s frame while the earth’s field swings past. How wrong the heading comes out depends on which way the truck happens to be parked and where the wheel sits rotationally — both of which change between runs. Simulated with a realistic offset, the same truck and the same camber readings gave <b>2.2°, 3.1°, 4.2°, 4.8°, 5.4°, 5.7°, 5.9° and 6.0°</b> purely from being parked eight different ways. It also can’t tell steering from the wheel simply <i>rolling</i>, which spins the phone and swings the heading with it.</p>
       <p class="hint"><b>What can still go wrong, and how it’s caught.</b> With the angle stored, the one remaining mistake is stopping <i>short</i> of the lock — that would be recorded as a full lock, and no amount of camber maths could tell. So the sweep still watches the sensor, not to measure the angle but to check every capture on a side reads about the same as the others. A distorted compass is perfectly repeatable even when it’s wildly inaccurate, which is exactly what that check needs.</p>
       <p class="hint"><b>You don’t have to hit any particular angle, and you don’t have to look at anything.</b> Steer until the wheel stops, hold it there, and it captures — then tells you out loud what it got. The maths uses the angle you actually reached, whatever it was, so the steering stop makes a perfect reference: it’s the same place every single time and you can feel it.</p>
@@ -401,6 +406,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <p class="hint"><b>Still sweep each wheel two or three times, re-seating the phone between sweeps.</b> Sweeps add up like camber readings, and the tile reports the spread so you can see whether to trust the number.</p>
       <div class="field" style="margin-top:10px"><label>Sweep style</label>
         <select id="sweepMode">
+          <option value="hand">Hand-held — 3 positions, nothing taped to the wheel</option>
           <option value="cal">Steering stops, angle from the tape — no angle sensor used</option>
           <option value="cont">Keep sweeping — angle from the phone’s sensors</option>
           <option value="stops">One pair — left stop, right stop, done</option>
@@ -878,6 +884,20 @@ function casTheta(){
          why:useC?null:(thC==null?"no compass":!geomOk?"portrait mount":!accOk?"compass unreliable":"compass not responding")};
 }
 
+/* Right-hand wheels need theta negated before the fit. See the long note in
+   finishCasterFit for the geometry; both the taped sweep and the hand-held
+   sequence go through here so neither can drift from the other. */
+function casSideFlip(w){return (w&&w.charAt(0)==="R")?-1:1;}
+function casFit(wheel,pts){
+  const f=casSideFlip(wheel);
+  const r=lsqCaster(f===1?pts:pts.map(q=>Object.assign({},q,{th:-q.th})));
+  if(r&&f===-1){   // report the swing as he drove it, not as the fit saw it
+    const ext=pts.map(q=>q.th);
+    r.thL=Math.max.apply(null,ext);r.thR=Math.min.apply(null,ext);
+  }
+  return r;
+}
+
 function solve3(A,b){   // 3x3 Gauss-Jordan with partial pivoting
   const M=[[A[0][0],A[0][1],A[0][2],b[0]],[A[1][0],A[1][1],A[1][2],b[1]],[A[2][0],A[2][1],A[2][2],b[2]]];
   for(let i=0;i<3;i++){
@@ -1036,7 +1056,7 @@ const S={
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
   barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
   stops:store.get("stops",{}),          // per-vehicle steering-lock angles {L:{deg,...},R:{deg,...}}, measured once with a tape
-  sweepMode:store.get("sweepMode","cont"),   // "cal" = steering stops with tape-measured angles (no angle sensor), "cont" = keep sweeping on sensor angles, "stops" = one pair, "deg" = steer to a set angle
+  sweepMode:store.get("sweepMode","hand"),   // "cal" = steering stops with tape-measured angles (no angle sensor), "cont" = keep sweeping on sensor angles, "stops" = one pair, "deg" = steer to a set angle
   voiceOn:store.get("voiceOn",true),    // spoken guidance during the caster sweep
   zero:store.get("zero",null),
   sess:store.get("sess2",null),
@@ -1069,6 +1089,15 @@ function shimFor(r){return Math.abs(Math.tan(R(r))*trackIn());}
    should still be defaulting into one. Flagged rather than forced every
    load, so a deliberate later choice of another mode is never overridden. */
 
+/* One-time move onto the hand-held sequence. Every taped mode puts the
+   phone's screen normal horizontal and pointing through the brake rotor,
+   which is the orientation that let the iron into the heading in the first
+   place; laying the phone flat takes that axis out of the answer. Flagged so
+   a deliberate later choice of another mode is never overridden. */
+if(!store.get("handMigrated",false)){
+  store.set("handMigrated",true);
+  if(S.sweepMode!=="hand"){S.sweepMode="hand";store.set("sweepMode","hand");}
+}
 function saveSpecs(){store.set("specs",S.specs);}
 
 /* ---------- steering-stop angles, measured once with a tape ----------
@@ -1747,6 +1776,7 @@ const casGate=()=>casCal()?4:CAS_MIN;
 const CAS_MIN=8;   // below this the sweep is too small for the divisor to be trustworthy
 async function casterStart(wheel){
   if(!sensor.on){toast("Enable sensors first");return;}
+  if(handActive()){handStart(wheel);return;}
   if(!sensor.hasRot){toast("No gyro on this device — caster sweep unavailable");return;}
   if(S.gyroSign===0){toast("Do the flat check first (Setup step 2) so turn direction is known");return;}
   // Checked up front: being told to go and measure the stops only AFTER
@@ -1806,6 +1836,7 @@ async function casterStart(wheel){
 function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;cas.pts=[];cas.acc0=null;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
 // The Stop button finishes a continuous run instead of throwing it away.
 function casStopBtn(){
+  if(hand.run){handAbort();toast("Hand-held sequence stopped");return;}
   if(cas.run&&cas.test){cas.test=false;casterAbort();toast("Sensor check stopped");return;}
   if(cas.run&&casCont()&&cas.pts.length>=4){finishCasterFit();return;}
   if(cas.run&&casCont()&&cas.pts.length>1){toast("Only "+(cas.pts.length-1)+" capture(s) — need 3 to solve, 4 to check itself");say("Not enough captures yet. Keep going.");return;}
@@ -1989,13 +2020,7 @@ function finishCasterFit(){
      form exactly, because sin is odd and cos is even. The stored points keep
      the PHYSICAL angle so the log and the swing readout stay honest about
      which way he actually turned; only the fit sees the flipped copy. */
-  const sideFlip=(cas.wheel&&cas.wheel.charAt(0)==="R")?-1:1;
-  const fitPts=sideFlip===1?used:used.map(q=>Object.assign({},q,{th:-q.th}));
-  const r=lsqCaster(fitPts);
-  if(r&&sideFlip===-1){   // report the swing as he drove it, not as the fit saw it
-    const ext=used.map(q=>q.th);
-    r.thL=Math.max.apply(null,ext);r.thR=Math.min.apply(null,ext);
-  }
+  const r=casFit(cas.wheel,used);
   if(!r){
     const m=casCal()?"Couldn't solve — need captures at both stops":"Couldn't solve — captures too alike, vary the steering amounts";
     toast(m);say(casCal()?"Could not solve that. I need captures at both stops.":"Could not solve that. The captures were too alike. Vary how far you turn.");
@@ -2136,6 +2161,145 @@ function casCalUI(){
   }else if(!$("calLen").value){$("calLen").value=S.barLen||48;}
   casCalPreview();
 }
+/* ---------- hand-held three-position sweep ----------------------------------
+
+   WHY THIS EXISTS, AND WHY IT SHOULD WORK WHERE THE TAPED SWEEP DID NOT.
+
+   Taping the phone flat to the wheel face puts the device Z axis -- the screen
+   normal -- HORIZONTAL and pointing straight through the cast-iron brake
+   rotor. A compass heading is computed from the two HORIZONTAL field
+   components, so in that mount the one magnetometer axis aimed at the biggest
+   lump of iron on the truck feeds the answer one-for-one. That is the whole
+   reason the taped sweep wandered 3 to 6 degrees.
+
+   Lay the phone FLAT instead, screen up, and Z becomes VERTICAL. The heading
+   is then built from X and Y only, and the rotor-facing axis is excluded from
+   it entirely. A residual tilt of alpha leaks only sin(alpha) of the Z offset
+   back in -- 3.5% at 2 degrees -- which is why the level gate below is not
+   decoration. Flat is also the orientation CoreLocation is designed around,
+   so tilt compensation is working in its best case rather than its worst.
+
+   Holding it at the rim edge rather than taping it mid-face also puts the
+   phone several inches further from the rotor, and 1/r^3 is steep.
+
+   So the sequence is, at each of three steering positions:
+     leg 0  phone FLAT on the rim, screen up, top toward the bumper  -> heading
+     leg 1  phone against the wheel FACE, screen out, top toward the bumper
+                                                                     -> camber
+   The steer angle is the heading DIFFERENCE between positions. Camber comes
+   off gravity exactly as it always has.
+
+   Two rules that matter more than they look:
+     - never turn the phone end-for-end between captures. Heading differences
+       are taken on the raw 0-360 reading by shortest path, so a 180 degree
+       flip would read as a 180 degree steer and is rejected rather than
+       silently halved.
+     - 15 to 30 degrees is plenty. Small sweeps also mean far less tyre scrub
+       against the floor, which is the other thing corrupting the taped runs. */
+const HAND_LEVEL_TOL=2.0;         // degrees off level allowed on a heading capture
+const HAND_MIN=12,HAND_MAX=45;    // sane steer angles for a caster sweep
+const HAND_POS=["STRAIGHT AHEAD","LEFT","RIGHT"];
+const hand={run:false,wheel:null,pos:0,leg:0,data:null,busy:false};
+
+// Phone flat and screen up reads g = (0,0,-1); the tilt off level is the size
+// of whatever is left in the horizontal pair.
+function handLevelErr(g){return D(Math.asin(clamp(Math.hypot(g[0],g[1]),0,1)));}
+function handFlatOk(g){return g[2]<-0.85&&handLevelErr(g)<=HAND_LEVEL_TOL;}
+function handFaceOk(g){return casMount(g)==="landscape";}
+// Heading falls as the wheel turns left, so negate to match the app's
+// "+ve theta = left" convention. Shortest path, so 359 -> 3 is +4 not -356.
+function handTheta(hdg0,hdg){
+  if(hdg0==null||hdg==null)return null;
+  return -headingStepDelta(hdg0,hdg);
+}
+function handActive(){return S.sweepMode==="hand";}
+
+function handStart(wheel){
+  if(!sensor.on){toast("Turn the sensors on first");return;}
+  if(!sensor.hasCompass){
+    toast("No compass on this device \u2014 the hand-held sequence needs one");
+    say("This device is not reporting a compass, and the hand-held sequence needs one.");
+    return;
+  }
+  hand.run=true;hand.wheel=wheel;hand.pos=0;hand.leg=0;hand.busy=false;
+  hand.data=[{},{},{}];
+  cas.run=false;cas.wheel=wheel;
+  keepAwake(true);
+  $("casMode").textContent="Hand-held \u00b7 "+wheel;
+  casUI();
+  say("Hand held sequence on the "+(wheel==="LF"?"left":"right")+" front. Wheels straight ahead. "+
+      "Lay the phone flat on the rim, screen up, top pointing at the bumper, and hold it level.");
+  toast("Straight ahead \u2014 phone FLAT on the rim, screen up");
+}
+function handAbort(){
+  hand.run=false;hand.busy=false;hand.data=null;
+  keepAwake(false);hush();
+  $("casMode").textContent="Caster sweep";
+  casUI();
+}
+async function handGrab(){
+  const s=await sample(900);
+  const d=hand.data[hand.pos];
+  if(hand.leg===0){
+    d.hdg=sensor.compassHeading;
+    d.lvl=handLevelErr(s.g);
+    d.acc=sensor.compassAccuracy;
+    hand.leg=1;
+    flash();beep(1180,0.09);
+    const th=hand.pos===0?0:handTheta(hand.data[0].hdg,d.hdg);
+    toast(HAND_POS[hand.pos]+" heading caught"+(hand.pos?" \u00b7 "+fmt(th,1)+"\u00b0 of steer":"")+
+          " \u2014 now against the wheel FACE");
+    say("Heading caught"+(hand.pos?", "+Math.round(Math.abs(th))+" degrees":"")+
+        ". Now hold it against the wheel face, screen facing out, top toward the bumper.");
+  }else{
+    d.camb=(S.camSign[hand.wheel]||1)*tiltZ(s.g);
+    hand.leg=0;hand.pos++;
+    flash();beep(1320,0.09);
+    if(hand.pos>2){handFinish();return;}
+    toast("Camber "+fmt(d.camb)+"\u00b0 \u2014 now steer "+HAND_POS[hand.pos]+" 15 to 30\u00b0");
+    say("Camber "+fmt(d.camb,1)+" degrees. Now steer "+HAND_POS[hand.pos].toLowerCase()+
+        ", fifteen to thirty degrees, then lay the phone flat on the rim again.");
+  }
+  casUI();
+}
+function handFinish(){
+  hand.run=false;keepAwake(false);hush();
+  $("casMode").textContent="Caster sweep";
+  const d=hand.data;
+  const thL=handTheta(d[0].hdg,d[1].hdg), thR=handTheta(d[0].hdg,d[2].hdg);
+  const bad=[];
+  if(thL==null||thR==null)bad.push("a heading went missing");
+  else{
+    if(Math.abs(thL)<HAND_MIN)bad.push("the LEFT steer was only "+fmt(Math.abs(thL),0)+"\u00b0");
+    if(Math.abs(thR)<HAND_MIN)bad.push("the RIGHT steer was only "+fmt(Math.abs(thR),0)+"\u00b0");
+    if(Math.abs(thL)>HAND_MAX||Math.abs(thR)>HAND_MAX)
+      bad.push("a steer angle over "+HAND_MAX+"\u00b0 \u2014 did the phone get turned end-for-end?");
+    if(thL<0||thR>0)bad.push("left and right came out the same way round");
+  }
+  if(bad.length){
+    toast("Couldn't use that run: "+bad[0]);
+    say("I could not use that run. "+bad[0]+". Try it again.");
+    hand.data=null;casUI();return;
+  }
+  const pts=[{th:0,camb:d[0].camb,src:"hand"},
+             {th:thL,camb:d[1].camb,src:"hand",hdg:d[1].hdg,lvl:d[1].lvl},
+             {th:thR,camb:d[2].camb,src:"hand",hdg:d[2].hdg,lvl:d[2].lvl}];
+  const r=casFit(hand.wheel,pts);
+  if(!r){toast("Couldn't solve that \u2014 the two steers were too alike");say("Could not solve that. The two steers were too alike.");hand.data=null;casUI();return;}
+  const prev=S.sess.cas[hand.wheel];
+  const entry={caster:r.caster,sai:r.sai,thL:r.thL,thR:r.thR,c0:r.c0,
+               nCap:r.n,rms:r.rms,fitSe:r.se,src:"hand",pts:pts,
+               cal:false,stopBad:0,sensorRatio:null,
+               worstLevel:Math.max(d[0].lvl||0,d[1].lvl||0,d[2].lvl||0)};
+  const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
+  S.sess.cas[hand.wheel]=casStat(sweeps);saveSess();
+  hand.data=null;casUI();renderResults();
+  const sp=spec();
+  toast("Caster "+fmt(r.caster)+"\u00b0 \u00b7 SAI "+fmt(r.sai)+"\u00b0 \u00b7 swing "+fmt(thL,0)+"/"+fmt(thR,0)+"\u00b0");
+  say("Caster "+fmt(r.caster,1)+" degrees on the "+(hand.wheel==="LF"?"left":"right")+" front. "+
+      "S A I "+fmt(r.sai,1)+". "+
+      (sp&&sp.cas!=null?(Math.abs(r.caster-sp.cas)<=(sp.casT||0.5)?"That is in spec.":"That is out of spec."):""));
+}
 function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
 // The raw captures, so a suspect result can be read back instead of guessed at.
 function casLogUI(){
@@ -2159,6 +2323,15 @@ function casLogUI(){
   el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
 }
 function casStepsUI(){
+  if(handActive()){
+    const th=[
+      "<b>Nothing gets taped to the wheel.</b> Wheels straight, then two captures at each of three steering positions — straight, left, right. <b>15 to 30°</b> of steer is plenty; more just scrubs the tyre against the floor for no gain.",
+      "<b>Heading:</b> lay the phone <b>FLAT on the rim, screen UP, top pointing at the bumper</b>, long edge pressed against the rim flange so it lines up with the wheel. Hold it <b>level</b> — it will not capture until you are inside "+HAND_LEVEL_TOL+"°, and that gate is doing real work.",
+      "<b>Camber:</b> same position, now turn the phone <b>onto the wheel face, screen OUT, still top-toward-the-bumper</b>. Then steer to the next position and repeat. <b>Never turn the phone end-for-end</b> — keep the top pointing forward all the way through."
+    ];
+    for(let i=1;i<=3;i++){const el=$("cstep"+i);if(el)el.querySelector(".stept").innerHTML=th[i-1];}
+    return;
+  }
   if(casCal()){
     const st=casStops();
     const tc=[
@@ -2519,7 +2692,31 @@ function tick(){
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
     setOrient("orientCas","orientCasTxt",casRollError(sensor.g),"plumb");
-    if(cas.run&&cas.phase>=2){
+    if(hand.run){
+      const g=sensor.g;
+      const held=sensor.stillSince?performance.now()-sensor.stillSince:0;
+      $("roCas").classList.remove("dead");
+      if(hand.leg===0){
+        // Heading leg. The level gate is the whole point: tilt the phone and
+        // the rotor-facing Z axis starts leaking back into the heading.
+        const lvl=handLevelErr(g),okFlat=handFlatOk(g);
+        $("roCas").innerHTML=fmt(lvl,1)+'<span class="u">° off level</span>';
+        $("roCasA").textContent=HAND_POS[hand.pos]+" · FLAT on the rim, screen UP, top to the bumper";
+        $("roCasB").textContent=(g[2]>=-0.85)?"lay it flat, screen UP"
+          :!okFlat?("level it — "+fmt(lvl,1)+"° off, needs under "+HAND_LEVEL_TOL+"°")
+          :(held>1000?"holding…":"hold still");
+        drawBubble($("bubCas"),lvl,{span:6,target:0,tol:HAND_LEVEL_TOL});
+        if(!hand.busy&&okFlat&&held>1000){hand.busy=true;handGrab().finally(()=>{hand.busy=false;});}
+      }else{
+        const camb=(S.camSign[hand.wheel]||1)*tiltZ(g),okFace=handFaceOk(g);
+        $("roCas").innerHTML=fmt(camb)+'<span class="u">° camber</span>';
+        $("roCasA").textContent=HAND_POS[hand.pos]+" · flat on the wheel FACE, screen OUT, top to the bumper";
+        $("roCasB").textContent=!okFace?"hold it against the wheel face, on its side"
+          :(held>1000?"holding…":"hold still");
+        drawBubble($("bubCas"),camb,{span:6});
+        if(!hand.busy&&okFace&&held>1000){hand.busy=true;handGrab().finally(()=>{hand.busy=false;});}
+      }
+    }else if(cas.run&&cas.phase>=2){
       const tAng=casTheta();
       const psi=tAng.th;
       $("roCas").classList.remove("dead");
