@@ -369,6 +369,10 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <div class="wtile"><div class="wname">LR · rear</div><div class="wval mono" id="camLRv">–</div><div class="wsub" id="camLRs"></div><button class="btn" data-camcap="LR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LR">clear</button></div>
         <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RR">clear</button></div>
       </div>
+      <details style="margin-top:10px" open><summary>Captures this session</summary><div class="dbody">
+        <div id="camRuns" class="small mono" style="white-space:pre-wrap">Nothing captured yet.</div>
+        <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnCamClearRuns">Clear all camber readings</button></div>
+      </div></details>
       <details style="margin-top:10px"><summary>How to hold it, and why three readings</summary><div class="dbody">
       <p class="hint"><b>Phone placement:</b> bar <b>upright</b> on the wheel lip (feet at 12 and 6 o’clock), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Same hold as the camber leg of a caster run, so nothing has to move between them. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
       <p class="hint"><b>Take three or four readings per wheel, lifting the phone off the bar and re-seating it between each one.</b> Every tap adds a reading rather than replacing the last, and the tile shows the average, how far the readings scattered, and how tight that average is. Holding the phone by hand means each placement sits a little differently — that scatter is the real error here, and one reading can never show it to you. Tapping again <i>without</i> re-seating measures nothing new.</p>
@@ -419,24 +423,15 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       </div>
     </div>
 
+    <details class="card" id="casRunsCard" open><summary>Captures this session</summary><div class="dbody">
+      <div id="casRuns" class="small mono" style="white-space:pre-wrap">Nothing captured yet.</div>
+      <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnCasClearRuns">Clear all caster captures</button></div>
+    </div></details>
+
     <details class="card" id="casOldCard"><summary>Other sweep modes, stop-angle tape calibration, sensor check</summary><div class="dbody">
       <h2>Steering sweep</h2>
-      <p class="hint">Caster can’t be read standing still — it shows up as <b>camber change while you steer</b>. The bar stays taped to one front wheel while you go and turn the steering; the app watches the wheel swing and grabs camber by itself each time you hold still.</p>
-      <p class="hint"><b>Keep sweeping until you press Stop, and vary how far you turn.</b> Every hold is another data point, and the app fits caster and SAI to all of them at once. Eight captures cut the scatter to about 0.15° where a single lock-to-lock pair gives 0.26°, and because there are then more readings than unknowns the fit also reports a <b>misfit</b> — how well the captures agree with each other. A single pair has no spare readings, so it fits perfectly no matter how wrong it is and can never warn you about anything.</p>
-      <p class="hint"><b>What misfit catches:</b> the bar shifting on the wheel, tape letting go, one fumbled capture. Under <b>0.22°</b> is healthy, over <b>0.40°</b> means something moved — re-tape and run it again. What it does <i>not</i> catch is a wrongly scaled steer angle: that error hides inside the fit almost perfectly, which is why the angle now comes from the compass instead of a learned gyro scale, and why a compass/gyro disagreement is announced out loud rather than left to the misfit to notice.</p>
-      <p class="hint"><b>Mount the phone on the straight edge once and leave it there.</b> Two captures at each of three steering positions — straight, left, right. Bar <b>across the wheel, flat, screen up</b> for the heading; then stand the same bar <b>up and down on the wheel face, phone top up, screen out</b> for the camber. Only the bar turns. Turn the wheel <b>as far as it will go</b>.</p>
-      <p class="hint"><b>The bar beats the bare phone at both jobs.</b> Across the wheel it rests on the rim front and rear, so it takes the wheel’s direction from two points instead of one short edge that can sit skew. Stood on the face it spans the rim top and bottom rather than rocking on the curve. Standing it up puts the phone upright for the camber capture, which changes nothing: camber is gravity along the <i>screen normal</i>, and rolling the phone about that normal cannot alter it — there is an assertion holding that to 1e-9. The old sideways-only rule existed purely so the compass could work in the taped mount; the heading is read flat now, so it is gone.</p>
-      <p class="hint"><b>Why flat matters, and why the taped sweep failed.</b> A compass heading is built from the two <i>horizontal</i> magnetometer axes. Taped to the wheel face, the phone’s screen-normal axis is horizontal and aimed <b>straight through the cast-iron brake rotor</b> — so the one axis pointed at the biggest lump of iron on the truck fed the answer one-for-one. Lay the phone flat and that axis becomes <i>vertical</i>, excluded from the heading entirely. Tilt it by 2° and only 3.5% leaks back; at 20° it is 34%. That is why the capture refuses to fire until you are inside 2° of level — the gate is doing the actual work. Holding it at the rim edge also puts it several inches further from the rotor, and the field falls off as 1/r³.</p>
-      <p class="hint"><b>Two rules.</b> On the <b>heading</b> leg keep the top of the bar pointing at the bumper — <b>never end-for-end</b>; a flip reads as a 180° steer and the run is refused rather than quietly halved. And <b>turn as far as the wheel will go</b>: the cost of a sloppy heading is caster×cot(θ), so it <i>shrinks</i> with angle — 0.26° of caster per degree at 15°, 0.19° at 20°, 0.12° at 30°, 0.08° at 45°.</p>
-      <p class="hint"><b>The tape-measured stop angles</b> (below) are still there as a backup, and the sensor sweeps still work if you want them.</p>
-      <p class="hint" style="opacity:.75"><b>Tape method:</b> the steer angle comes off a tape measure — no sensor involved.</p>
-      <p class="hint" style="opacity:.75"><b>(taped sweep, kept for reference)</b> Measure your two steering locks once (below), and every sweep after that uses those stored numbers. This is how an alignment rack does it: the angle is read from a mechanical protractor in the turnplate, never from a sensor riding on the wheel. Your steering stops are a better reference than a turnplate anyway — metal on metal, the same angle every single time, and you can feel them without looking.</p>
-      <p class="hint"><b>Why the phone can’t do it.</b> Two honest attempts both failed on the truck. The gyro needs a learned scale factor that can be stale or reset — that was the 14° reading. The compass fails worse and less obviously: the phone is taped to a <b>steel wheel with a cast-iron brake rotor right behind it</b>, and that iron turns <i>with</i> the phone, so its magnetic pull sits fixed in the phone’s frame while the earth’s field swings past. How wrong the heading comes out depends on which way the truck happens to be parked and where the wheel sits rotationally — both of which change between runs. Simulated with a realistic offset, the same truck and the same camber readings gave <b>2.2°, 3.1°, 4.2°, 4.8°, 5.4°, 5.7°, 5.9° and 6.0°</b> purely from being parked eight different ways. It also can’t tell steering from the wheel simply <i>rolling</i>, which spins the phone and swings the heading with it.</p>
-      <p class="hint"><b>What can still go wrong, and how it’s caught.</b> With the angle stored, the one remaining mistake is stopping <i>short</i> of the lock — that would be recorded as a full lock, and no amount of camber maths could tell. So the sweep still watches the sensor, not to measure the angle but to check every capture on a side reads about the same as the others. A distorted compass is perfectly repeatable even when it’s wildly inaccurate, which is exactly what that check needs.</p>
-      <p class="hint"><b>You don’t have to hit any particular angle, and you don’t have to look at anything.</b> Steer until the wheel stops, hold it there, and it captures — then tells you out loud what it got. The maths uses the angle you actually reached, whatever it was, so the steering stop makes a perfect reference: it’s the same place every single time and you can feel it.</p>
-      <p class="hint"><b>Going to the stops is also more accurate than the old ±15°.</b> Caster comes from a camber difference divided by sinθL−sinθR. At ±15° that divisor is 0.518, so every bit of hand-placement scatter comes back <b>1.9× bigger</b>. At full lock, around ±35°, the divisor is about 1.15 — it <b>shrinks</b> the scatter to 0.87× instead. End to end that is a bit over <b>twice as steady</b> a number for the same sloppiness.</p>
-      <p class="hint"><b>Your two stops don’t have to match, and they won’t.</b> Steering stops are rarely symmetric. The app solves caster and SAI together from the two angles you actually reached rather than assuming they mirror each other — assuming it would have quietly leaked your SAI into the caster number, about a quarter of a degree at a typical 37°/33° pair. Just go to the stop on each side and let it read whatever it reads.</p>
-      <p class="hint"><b>Still sweep each wheel two or three times, re-seating the phone between sweeps.</b> Sweeps add up like camber readings, and the tile reports the spread so you can see whether to trust the number.</p>
+      <p class="hint">Caster is not readable standing still — it shows up as <b>camber change while you steer</b>. Every mode here is the same measurement; they differ only in <b>where the steer angle comes from</b>.</p>
+      <div id="casModeNote" class="note" style="margin-top:8px"></div>
       <div class="field" style="margin-top:10px"><label>Sweep style</label>
         <select id="sweepMode">
           <option value="hand">Hand-held — 3 positions, nothing taped to the wheel</option>
@@ -596,12 +591,16 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div id="resExtra" class="hint" style="margin-top:10px"></div>
       <div class="btnrow" style="margin-top:12px">
         <button class="btn primary" id="btnCopyReport">Copy report text</button>
-        <button class="btn" id="btnSaveSession">Archive this session</button>
+        <button class="btn" id="btnSaveSession">Save this session</button>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>Notes for this session</label>
+        <input id="sessNotes" type="text" placeholder="e.g. after new idler arm, shimmed LF +1/8&quot;">
       </div>
       <div id="resAdvice" style="margin-top:10px"></div>
     </div>
     <div class="card">
-      <h2>Past sessions</h2>
+      <h2>Saved sessions</h2>
       <div id="pastList" class="hint">None yet.</div>
     </div>
   </div>
@@ -1813,6 +1812,8 @@ function camUI(){
     $("cam"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+
       " · "+q+"<br>roll corr "+fmt(camberCorrection(w))+"°";
   }
+
+  camRunsUI();
 }
 function camSignFix(side){
   const keys=side==="L"?["LF","LR"]:["RF","RR"];
@@ -2101,7 +2102,7 @@ function finishCasterFit(){
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[cas.wheel]=casStat(sweeps);saveSess();
   cas.pts=[];cas.acc0=null;cas.testReport=null;   // run is stored; the log reads it back from there
-  cas.phase=4;casUI();renderResults();
+  cas.phase=4;casUI();casRunsUI();renderResults();
   const bad=r.rms>0.40;   // see lsqCaster: healthy runs sit near 0.16, p90 0.22
   if(dropped.size){
     const which=Array.from(dropped).join(", ");
@@ -2413,14 +2414,71 @@ function handFinish(){
                worstLevel:Math.max(d[0].lvl||0,d[1].lvl||0,d[2].lvl||0)};
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[hand.wheel]=casStat(sweeps);saveSess();
-  hand.data=null;casUI();renderResults();
+  hand.data=null;casUI();casRunsUI();renderResults();
   const sp=spec();
   toast("Caster "+fmt(r.caster)+"\u00b0 \u00b7 SAI "+fmt(r.sai)+"\u00b0 \u00b7 swing "+fmt(thL,0)+"/"+fmt(thR,0)+"\u00b0");
   say("Caster "+fmt(r.caster,1)+" degrees on the "+(hand.wheel==="LF"?"left":"right")+" front. "+
       "S A I "+fmt(r.sai,1)+". "+
       (sp&&sp.cas!=null?(Math.abs(r.caster-sp.cas)<=(sp.casT||0.5)?"That is in spec.":"That is out of spec."):""));
 }
-function casClear(w){delete S.sess.cas[w];saveSess();casUI();renderResults();toast(w+" caster cleared");}
+/* Every run kept and shown, not just the average.
+
+   The raw captures were already being stored -- cas sweeps, cam samples --
+   but only the mean was ever displayed, so a run that disagreed with the one
+   before it was silently folded in instead of sitting there to be compared.
+   Seeing "Capture 1: 4.2, Capture 2: 5.9" is the whole diagnosis. */
+function runsLines(){
+  const L=[];
+  for(const w of ["LF","RF"]){
+    const e=S.sess.cas[w];
+    if(!e||!e.sweeps||!e.sweeps.length)continue;
+    L.push(w);
+    e.sweeps.forEach((sw,i)=>{
+      L.push("  Capture "+(i+1)+"   caster "+fmt(sw.caster).padStart(6)+"°"+
+             "   SAI "+fmt(sw.sai).padStart(6)+"°"+
+             "   swing "+fmt(sw.thL,0)+"/"+fmt(sw.thR,0)+"°"+
+             (sw.rms!=null?"   misfit ±"+sw.rms.toFixed(2)+"°":"")+
+             (sw.src?"   "+sw.src:""));
+    });
+    if(e.sweeps.length>1){
+      const v=e.sweeps.map(x=>x.caster);
+      const mean=v.reduce((a,b)=>a+b,0)/v.length;
+      L.push("  — average "+fmt(mean)+"° over "+v.length+
+             ", spread "+(Math.max.apply(null,v)-Math.min.apply(null,v)).toFixed(2)+"°");
+    }
+    L.push("");
+  }
+  return L;
+}
+function casRunsUI(){
+  const el=$("casRuns"); if(!el)return;
+  const L=runsLines();
+  while(L.length&&L[L.length-1]==="")L.pop();
+  el.textContent=L.length?L.join(NLCH):"Nothing captured yet.";
+}
+function camRunsUI(){
+  const el=$("camRuns"); if(!el)return;
+  const L=[];
+  for(const w of ["LF","RF","LR","RR"]){
+    const e=S.sess.cam[w];
+    if(!e||!e.samples||!e.samples.length)continue;
+    const corr=camberCorrection(w);
+    const vals=e.samples.map((v,i)=>"#"+(i+1)+" "+fmt(v+corr));
+    L.push(w+"   "+vals.join("   "));
+    L.push("     average "+fmt(camVal(w))+"°"+
+           (e.sd!=null?"  · scatter ±"+e.sd.toFixed(2)+"°":"")+
+           "  · "+e.n+" reading"+(e.n>1?"s":""));
+  }
+  el.textContent=L.length?L.join(NLCH):"Nothing captured yet.";
+}
+function casClearRuns(){
+  for(const w of ["LF","RF"])delete S.sess.cas[w];
+  saveSess();casUI();casRunsUI();renderResults();toast("All caster captures cleared");
+}
+function camClearRuns(){
+  S.sess.cam={};saveSess();camUI();camRunsUI();renderResults();toast("All camber readings cleared");
+}
+function casClear(w){delete S.sess.cas[w];saveSess();casUI();casRunsUI();renderResults();toast(w+" caster cleared");}
 // The raw captures, so a suspect result can be read back instead of guessed at.
 function casLogUI(){
   const el=$("casLog");if(!el)return;
@@ -2441,6 +2499,17 @@ function casLogUI(){
     return lbl.padStart(6)+"  steer "+fmt(q.th,1).padStart(7)+"°   camber "+fmt(q.camb,2).padStart(7)+"°"+(raw||both)+flag;
   });
   el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
+}
+const CAS_MODE_NOTE={
+  hand:"<b>Hand-held · three positions.</b> Angle comes from the phone's COMPASS, read with the bar laid flat, which keeps the rotor-facing axis out of the heading. Nothing taped. Turn as far as the wheel will go — accuracy improves with angle.",
+  cal:"<b>Steering stops · tape-calibrated.</b> Angle comes from a TAPE MEASURE: measure both steering locks once (below) and every sweep uses those stored numbers. No angle sensor in the path at all.",
+  cont:"<b>Keep sweeping · sensor angle.</b> Angle comes from the compass or gyro with the phone TAPED to the wheel face. That mount aims the phone's screen-normal axis straight through the brake rotor, which is what made readings wander 3° to 6° on this truck. Kept only for a phone that reads clean.",
+  stops:"<b>One lock-to-lock pair · sensor angle.</b> Two captures, taped mount. Exactly as many equations as unknowns, so the misfit is always zero and can never warn you about anything.",
+  deg:"<b>Steer to a set angle · sensor angle.</b> Taped mount, aim for a target angle on screen."
+};
+function casModeNoteUI(){
+  const el=$("casModeNote"); if(!el)return;
+  el.innerHTML=CAS_MODE_NOTE[S.sweepMode]||"";
 }
 function casStepsUI(){
   if(handActive()){
@@ -2729,11 +2798,33 @@ function reportText(){
   return L.join("\n");
 }
 async function copyReport(){const txt=reportText();try{await navigator.clipboard.writeText(txt);toast("Report copied");}catch(e){prompt("Copy this:",txt);}}
-function archiveSession(){S.past.unshift({when:Date.now(),text:reportText()});S.past=S.past.slice(0,12);store.set("past",S.past);toast("Archived");renderPast();}
+/* A saved session is worth nothing six months later if it does not say WHICH
+   TRUCK and WHY. Date alone cannot tell "before the idler arm" from "after". */
+function archiveSession(){
+  const n=$("sessNotes");
+  const notes=n?n.value.trim():"";
+  S.past.unshift({when:Date.now(),veh:S.veh,vehName:prof().short,notes:notes,text:reportText()});
+  S.past=S.past.slice(0,24);
+  store.set("past",S.past);
+  if(n)n.value="";
+  toast("Saved: "+prof().short+(notes?" · "+notes.slice(0,30):""));
+  renderPast();
+}
 function renderPast(){
   const el=$("pastList");
   if(!S.past.length){el.textContent="None yet.";return;}
-  el.innerHTML=S.past.map(p=>`<details style="margin-top:6px"><summary>${new Date(p.when).toLocaleString()}</summary><div class="dbody"><pre class="diag" style="margin:0">${p.text}</pre></div></details>`).join("");
+  const esc=t=>String(t==null?"":t).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  el.innerHTML=S.past.map((p,i)=>{
+    const d=new Date(p.when);
+    const when=d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})+
+               " "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+    const veh=p.vehName?" · <b>"+esc(p.vehName)+"</b>":"";
+    const note=p.notes?' · <span class="small">'+esc(p.notes)+"</span>":"";
+    return '<details style="margin-top:6px"><summary>'+when+veh+note+'</summary><div class="dbody">'+
+           '<pre class="diag" style="margin:0">'+esc(p.text)+'</pre>'+
+           '<div class="btnrow" style="margin-top:8px"><button class="btn ghost" data-pastdel="'+i+'">Delete</button></div>'+
+           '</div></details>';
+  }).join("");
 }
 function newSession(){
   if(Object.keys(S.sess.cam).length||S.sess.toeF!=null)archiveSession();
@@ -2786,6 +2877,32 @@ async function keepAwake(){
 
 /* ---------- live loop ---------- */
 let activeScr="setup";
+/* ONE indicator that is always right, because it asks gravity how the phone
+   is being held rather than being told at the call site.
+
+   Getting this wrong is invisible and expensive: a flat phone has g[0] and
+   g[1] both near zero, so a roll indicator reads a confident 0.0 no matter
+   how badly tilted the bar is -- which is exactly what the caster heading
+   leg was doing before. And an upright phone has gravity down one of those
+   axes, so a level indicator would read a permanent 90.
+
+     flat       what matters is tilt off HORIZONTAL, both axes at once
+     upright    what matters is twist about the screen normal, one axis,
+                and WHICH axis depends on portrait vs landscape
+
+   Used by camber, caster and toe, so no screen can drift out of step with
+   how its own captures are actually held. */
+function autoOrient(g){
+  const m=casMount(g);
+  if(m==="flat")     return{err:handLevelErr(g),label:"level",tol:HAND_LEVEL_TOL};
+  if(m==="landscape")return{err:D(Math.asin(clamp(g[1],-1,1))),label:"plumb",tol:3};
+  return{err:liveRollError(g),label:"plumb",tol:3};   // portrait: calibrated zero applies
+}
+function setOrientAuto(elId,txtId,g){
+  const o=autoOrient(g);
+  setOrient(elId,txtId,o.err,o.label,o.tol);
+  return o;
+}
 function setOrient(elId,txtId,errDeg,label,tol){
   const el=$(elId);
   const t=tol||3;
@@ -2809,7 +2926,7 @@ function tick(){
     const tgt=(camSide==="LR"||camSide==="RR")?sp.rcam:sp.cam, tol=(camSide==="LR"||camSide==="RR")?sp.rcamT:sp.camT;
     drawBubble($("bubCam"),v,{span:Math.max(2.5,Math.abs(tgt)+tol+1),target:tgt,tol:tol});
     $("stCam").classList.toggle("on",!!steadyNow);
-    setOrient("orientCam","orientCamTxt",liveRollError(sensor.g),"plumb");
+    setOrientAuto("orientCam","orientCamTxt",sensor.g);
   }
   if(activeScr==="caster"&&sensor.on){
     $("stCas").classList.toggle("on",!!steadyNow);
@@ -2833,7 +2950,7 @@ function tick(){
         const lvl=handLevelErr(g);
         $("roCas").innerHTML=fmt(lvl,1)+'<span class="u">° off level</span>';
         drawBubble($("bubCas"),lvl,{span:6,target:0,tol:HAND_LEVEL_TOL});
-        setOrient("orientCas","orientCasTxt",lvl,"level",HAND_LEVEL_TOL);
+        setOrientAuto("orientCas","orientCasTxt",g);
         $("roCasA").textContent="heading "+(sensor.compassHeading==null?"–":Math.round(sensor.compassHeading)+"°");
         $("roCasB").textContent=(g[2]>=-0.85)?"lay the bar FLAT, screen UP"
           :handFlatOk(g)?"level — capture it":"level it first";
@@ -2841,13 +2958,13 @@ function tick(){
         const camb=(S.camSign[hand.wheel]||1)*tiltZ(g);
         $("roCas").innerHTML=fmt(camb)+'<span class="u">° camber</span>';
         drawBubble($("bubCas"),camb,{span:6});
-        setOrient("orientCas","orientCasTxt",liveRollError(g),"plumb");
+        setOrientAuto("orientCas","orientCasTxt",g);
         $("roCasA").textContent="bar upright on the wheel face";
         $("roCasB").textContent=handFaceOk(g)?"ready — capture it":"stand the bar UP";
       }
       handUI();
     }else if(cas.run&&cas.phase>=2){
-      setOrient("orientCas","orientCasTxt",casRollError(sensor.g),"plumb");
+      setOrientAuto("orientCas","orientCasTxt",sensor.g);
       const tAng2=casTheta();
       const tAng=tAng2;
       const psi=tAng.th;
@@ -2898,7 +3015,7 @@ function tick(){
   }
   if(activeScr==="toe"&&sensor.on){
     $("stToe").classList.toggle("on",!!steadyNow);
-    setOrient("orientToe","orientToeTxt",liveLevelError(sensor.g),"level");
+    setOrientAuto("orientToe","orientToeTxt",sensor.g);
     if(toe.run&&toe.idx>=1){
       $("roToe").classList.remove("dead");
       $("roToe").innerHTML=fmt(sensor.yaw)+'<span class="u">°</span>';
@@ -2963,8 +3080,10 @@ $("btnCalClear").addEventListener("click",casCalClear);
 $("calSide").addEventListener("change",casCalPreview);
 casCalUI();
 $("sweepMode").value=S.sweepMode;
-$("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();handModeUI();});
+$("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();casModeNoteUI();handModeUI();});
 $("btnHandCap").addEventListener("click",handCapture);
+$("btnCasClearRuns").addEventListener("click",casClearRuns);
+$("btnCamClearRuns").addEventListener("click",camClearRuns);
 $("btnHandUndo").addEventListener("click",handUndo);
 $("btnHandStop").addEventListener("click",()=>{handAbort();toast("Stopped");});
 $("btnHandLF").addEventListener("click",()=>handStart("LF"));
@@ -2996,6 +3115,7 @@ function handModeUI(){
   handUI();
 }
 handModeUI();
+casModeNoteUI();
 casStepsUI();
 function casVoiceUI(){
   $("btnCasVoice").textContent="Voice: "+(S.voiceOn?"on":"off");
@@ -3019,6 +3139,11 @@ $("btnTapeCalc").addEventListener("click",tapeCalc);
 $("btnCopyReport").addEventListener("click",copyReport);
 $("btnSaveSession").addEventListener("click",archiveSession);
 $("btnNewSession").addEventListener("click",newSession);
+$("pastList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-pastdel]"); if(!b)return;
+  const i=+b.getAttribute("data-pastdel");
+  S.past.splice(i,1);store.set("past",S.past);renderPast();toast("Deleted");
+});
 $("btnKeepAwake").addEventListener("click",keepAwake);
 for(const id in specMap)$(id).addEventListener("change",specSave);
 $("btnIntroEnable").addEventListener("click",()=>{store.set("introDone",true);$("intro").hidden=true;enableSensors();});
