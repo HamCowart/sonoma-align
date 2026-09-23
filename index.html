@@ -166,6 +166,14 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 .runrow .btn{flex:none;font-size:12px;padding:4px 10px;min-width:44px}
 .runrow .btn.arm{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
 .runavg{padding:5px 0 2px;font-size:13px;color:var(--mut)}
+
+.lvlw{margin-top:8px}
+.lvl{display:block;width:100%;height:112px}
+.lvltxt{font-family:"IBM Plex Mono",monospace;font-size:12px;text-align:center;margin-top:4px;color:var(--face-mut)}
+.lvltxt b{color:var(--digit);font-weight:600}
+
+.face .row2 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#lvlCam{height:64px}   /* camber is always an upright hold: one axis needs no square */
 </style>
 
 <header>
@@ -375,18 +383,18 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="readout dead" id="roCam">––.––<span class="u">°</span></div>
       <div class="bubblewrap"><svg class="bubble" id="bubCam"></svg></div>
       <div class="row2"><span id="roCamRaw">raw –</span><span id="roCamFloor">floor corr –</span></div>
-      <div class="orient" id="orientCam"><i></i><span id="orientCamTxt">plumb –</span></div>
+      <div class="lvlw" id="orientCam"><svg class="lvl" id="lvlCam"></svg><div class="lvltxt" id="orientCamTxt">plumb –</div></div>
     </div>
 
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
-      <div class="note" style="margin-top:8px;margin-bottom:10px">Bar <b>UPRIGHT</b> on the wheel lip (feet 12 &amp; 6) · <b>screen OUT</b> · <b>top UP</b>. Tap the wheel you are on, hold still, capture on green. <b>Three or four per wheel</b>, re-seating the bar each time.</div>
       <div class="wheels" style="margin-top:10px">
         <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LF">clear</button></div>
         <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RF">clear</button></div>
         <div class="wtile"><div class="wname">LR · rear</div><div class="wval mono" id="camLRv">–</div><div class="wsub" id="camLRs"></div><button class="btn" data-camcap="LR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LR">clear</button></div>
         <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RR">clear</button></div>
       </div>
+      <div class="note" style="margin-top:10px">Bar <b>UPRIGHT</b> on the wheel lip (feet 12 &amp; 6) · <b>screen OUT</b> · <b>top UP</b>. Tap the wheel you are on, hold still, capture on green. <b>Three or four per wheel</b>, re-seating the bar each time.</div>
       <details style="margin-top:10px" open><summary>Captures this session</summary><div class="dbody">
         <div id="camRuns" class="small">Nothing captured yet.</div>
         <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnCamClearRuns">Clear all camber readings</button></div>
@@ -415,7 +423,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="readout dead" id="roCas">––.–<span class="u">°</span></div>
       <div class="bubblewrap"><svg class="bubble" id="bubCas"></svg></div>
       <div class="row2"><span id="roCasA">camber –</span><span id="roCasB">target –</span></div>
-      <div class="orient" id="orientCas"><i></i><span id="orientCasTxt">plumb –</span></div>
+      <div class="lvlw" id="orientCas"><svg class="lvl" id="lvlCas"></svg><div class="lvltxt" id="orientCasTxt">level –</div></div>
     </div>
 
     <div class="card" id="handCard">
@@ -526,32 +534,32 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     <div class="face">
       <div class="label"><span id="toeMode">Toe · gyro carry</span><span class="steady" id="stToe"><i></i><span>steady</span></span></div>
       <div class="readout dead" id="roToe">––.––<span class="u">°</span></div>
-      <div class="bubblewrap"><svg class="bubble" id="bubToe"></svg></div>
+      <div class="bubblewrap" style="display:none"><svg class="bubble" id="bubToe"></svg></div>
       <div class="row2"><span id="roToeA">–</span><span id="roToeB">–</span></div>
-      <div class="orient" id="orientToe"><i></i><span id="orientToeTxt">level –</span></div>
+      <div class="lvlw" id="orientToe"><svg class="lvl" id="lvlToe"></svg><div class="lvltxt" id="orientToeTxt">level –</div></div>
     </div>
 
     <div class="card">
       <div class="spread"><h2>Gyro toe</h2><span class="pill na">±0.05–0.15°</span></div>
-      <div class="note" style="margin-top:8px;margin-bottom:10px">Bar <b>HORIZONTAL</b> across the wheel (feet 3 &amp; 9) · <b>screen OUT</b> · <b>top at the BUMPER on every wheel</b>. Carry it smoothly — no flips, no spins.</div>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn" id="btnToeModeF">Front only</button>
         <button class="btn sel" id="btnToeModeA">All 4 wheels</button>
         <button class="btn" id="btnToeModeX">+ Frame rails</button>
       </div>
-      <p class="small" style="margin-top:6px" id="toeModeNote">All-4 measures front toe, rear toe, and references the fronts to the rear axle — needed for steering-wheel centering.</p>
       <div class="btnrow" style="margin-top:8px">
         <button class="btn primary" id="btnToeStart">Start pass</button>
         <button class="btn" id="btnToeCap" disabled>Capture</button>
         <button class="btn ghost" id="btnToeReset">Clear passes</button>
       </div>
       <div class="hint" id="toeState" style="margin-top:8px">Not running.</div>
+      <p class="small" style="margin-top:6px" id="toeModeNote">All-4 measures front toe, rear toe, and references the fronts to the rear axle — needed for steering-wheel centering.</p>
+      <div class="note" style="margin-top:8px">Bar <b>ACROSS the wheel, flat</b> on the rim front and rear · <b>screen UP</b> · <b>top at the BUMPER on every wheel</b>. Level it on the target, then capture. Carry it smoothly — no flips, no spins.</div>
       <div class="tscroll" style="margin-top:8px"><table id="toeTable" style="display:none">
         <thead><tr><th>#</th><th>Front</th><th>Rear</th><th>LF/RF split</th><th>Drift</th><th></th></tr></thead><tbody></tbody>
       </table></div>
       <div class="hint" id="toeAvg" style="margin-top:6px"></div>
-      <details style="margin-top:10px"><summary>How the carry works, and why the screen direction is free here</summary><div class="dbody">
-      <p class="hint"><b>Phone placement:</b> bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>screen facing OUT</b> — away from the truck — and <b>top of phone toward the front bumper on every wheel</b>. Screen direction is not fussy here the way it is elsewhere: this carry runs on the <b>gyro</b>, which is blind to magnets and to how the phone is rolled, so only the two feet on the rim and the top pointing forward actually set the reading. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
+      <details style="margin-top:10px"><summary>How the carry works</summary><div class="dbody">
+      <p class="hint"><b>Phone placement:</b> bar laid <b>across the wheel, flat</b>, resting on the rim front and rear, <b>screen UP</b>, <b>top of phone toward the front bumper on every wheel</b> — the same hold as the caster heading leg. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. The gyro reads rotation about gravity, so it is indifferent to how the phone is rolled; the level target is there so every stop is held the same way. Carry the bar smoothly — no flips, no spins.</p>
       </div></details>
       <div id="frameBlock" style="display:none;margin-top:10px" class="hint"><div id="frameOut"></div></div>
       <div class="note warn" style="margin-top:8px">Toe tolerances are about a tenth of a degree — the edge of what a phone gyro does. Run <b>3 passes</b> and trust the average; sanity-check with the tape method before final tightening.</div>
@@ -691,7 +699,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
           <tr><td><b>Camber</b></td><td>bar upright on wheel, feet 12 &amp; 6</td><td>OUT</td><td>UP</td></tr>
           <tr><td><b>Caster</b> · heading leg</td><td>bar flat ACROSS the wheel, level</td><td>UP</td><td><b>bumper</b></td></tr>
           <tr><td><b>Caster</b> · camber leg</td><td>bar upright on the wheel face</td><td>OUT</td><td>UP</td></tr>
-          <tr><td><b>Toe</b> · at each wheel</td><td>bar horizontal on wheel, feet 3 &amp; 9</td><td>OUT</td><td><b>bumper</b>, every wheel</td></tr>
+          <tr><td><b>Toe</b> · at each wheel</td><td>bar flat ACROSS the wheel, level</td><td>UP</td><td><b>bumper</b>, every wheel</td></tr>
           <tr><td><b>Toe</b> · at a frame rail</td><td>bare phone flat on the rail face</td><td>UP</td><td>truck front</td></tr>
           <tr><td><b>Caster</b> · taped modes</td><td>taped to the wheel face, sideways</td><td>OUT</td><td><b>bumper</b></td></tr>
         </tbody>
@@ -1129,7 +1137,8 @@ const S={
   gyroScale:store.get("gyroScale",1),   // corrects a real-device rotationRate scale error; learned via compass when available
   camSign:store.get("camSign",{LF:1,RF:1,LR:1,RR:1}),
   rollZero:store.get("rollZero",0),     // plumb-axis offset, zeroed against a trusted external level
-  levelZero:store.get("levelZero",0),   // level-axis offset, same idea for the horizontal hold
+  levelZero:store.get("levelZero",0),   // legacy: a single magnitude, which cannot correct a 2-axis level
+  levelZero2:store.get("levelZero2",null), // per-axis flat zero [side-side, top-bottom], degrees
   specs:store.get("specs",{}),          // per-vehicle overrides
   floors:store.get("floors",{}),        // per-vehicle {front:{slope,when,bias,span,track}, rear:{...}}
   barLen:store.get("barLen",48),        // length of the straight edge used for the floor span, inches
@@ -1431,7 +1440,7 @@ const liveRollError=g=>rollError(g)-(S.rollZero||0);
    which is fine for what this is -- an advisory hold-consistency light with
    deliberately generous thresholds, not an input to any measurement. */
 const casRollError=g=>casMount(g)==="landscape"?D(Math.asin(clamp(g[1],-1,1))):liveRollError(g);
-const liveLevelError=g=>levelError(g)-(S.levelZero||0);
+const liveLevelError=g=>handLevelErr(g);   // per-axis corrected; the scalar zero could not be
 window.__align.liveRollError=liveRollError;window.__align.liveLevelError=liveLevelError;
 function waitSteady(preMs=800){return new Promise(r=>{const iv=setInterval(()=>{if(isSteady(preMs)){clearInterval(iv);r(true);}},100);});}
 
@@ -1658,13 +1667,17 @@ async function zeroAgainstLevel(kind){
     S.rollZero=rollError(s.g);store.set("rollZero",S.rollZero);
     st.innerHTML="<b>Plumb zeroed ✓</b> was reading "+fmt(S.rollZero)+"° at true vertical — now corrected.";
   }else{
-    S.levelZero=levelError(s.g);store.set("levelZero",S.levelZero);
-    st.innerHTML="<b>Level zeroed ✓</b> was reading "+fmt(S.levelZero)+"° at true flat — now corrected.";
+    // Per axis. A single magnitude cannot be subtracted from a signed 2-axis
+    // reading -- it would push one side's error the wrong way.
+    const a=[D(Math.asin(clamp(s.g[0],-1,1))),D(Math.asin(clamp(s.g[1],-1,1)))];
+    S.levelZero2=a;store.set("levelZero2",a);
+    S.levelZero=Math.hypot(a[0],a[1]);store.set("levelZero",S.levelZero);
+    st.innerHTML="<b>Level zeroed ✓</b> was reading "+fmt(a[1],1)+"° top–bottom, "+fmt(a[0],1)+"° side–side at true flat — now corrected.";
   }
   flash();beep(1320,0.12);
 }
 function resetLevelZero(kind){
-  if(kind==="roll"){S.rollZero=0;store.set("rollZero",0);}else{S.levelZero=0;store.set("levelZero",0);}
+  if(kind==="roll"){S.rollZero=0;store.set("rollZero",0);}else{S.levelZero=0;store.set("levelZero",0);S.levelZero2=null;store.set("levelZero2",null);}
   $("levelZeroState").textContent=(kind==="roll"?"Plumb":"Level")+" zero reset to 0°.";
   toast((kind==="roll"?"Plumb":"Level")+" zero reset");
 }
@@ -2333,7 +2346,22 @@ const hand={run:false,wheel:null,pos:0,leg:0,data:null,busy:false};
 
 // Phone flat and screen up reads g = (0,0,-1); the tilt off level is the size
 // of whatever is left in the horizontal pair.
-function handLevelErr(g){return D(Math.asin(clamp(Math.hypot(g[0],g[1]),0,1)));}
+/* Tilt of a FLAT phone, per axis and SIGNED, in degrees:
+     [0] side-to-side   + when the right edge (screen right) is LOW
+     [1] top-to-bottom  + when the top end is LOW
+   less the per-axis zero from Setup 2b. The old display used only the
+   magnitude hypot(g0,g1), which carries no sign -- see levelDisplay(). */
+function levelVec(g){
+  const z=(typeof S!=="undefined"&&S.levelZero2)||[0,0];
+  return[D(Math.asin(clamp(g[0],-1,1)))-z[0],D(Math.asin(clamp(g[1],-1,1)))-z[1]];
+}
+/* Resultant tilt off flat -- the caster capture gate. With no zero stored this
+   is exactly asin(hypot(g0,g1)), as before; with one, the same thing measured
+   from the corrected axes, so the green circle and the gate always agree. */
+function handLevelErr(g){
+  const a=levelVec(g);
+  return D(Math.asin(clamp(Math.hypot(Math.sin(R(a[0])),Math.sin(R(a[1]))),0,1)));
+}
 function handFlatOk(g){return g[2]<-0.85&&handLevelErr(g)<=HAND_LEVEL_TOL;}
 /* The phone stays bolted to the straight edge for the whole sequence, so the
    bar -- not the phone -- is what gets reoriented: ACROSS the wheel for the
@@ -2999,31 +3027,107 @@ async function keepAwake(){
 
 /* ---------- live loop ---------- */
 let activeScr="setup";
-/* ONE indicator that is always right, because it asks gravity how the phone
-   is being held rather than being told at the call site.
+/* ---------- level / plumb target ----------
+   WHAT WAS WRONG. The old indicator plotted asin(hypot(g0,g1)) -- a
+   MAGNITUDE. It has no sign, so the ball could only ever sit on one side of
+   centre, and tipping the phone through level sent it back out along the
+   SAME side instead of across. Which way you were off was simply not in the
+   number being drawn.
 
-   Getting this wrong is invisible and expensive: a flat phone has g[0] and
-   g[1] both near zero, so a roll indicator reads a confident 0.0 no matter
-   how badly tilted the bar is -- which is exactly what the caster heading
-   leg was doing before. And an upright phone has gravity down one of those
-   axes, so a level indicator would read a permanent 90.
+   Every axis is now drawn SIGNED, and the layout follows gravity:
 
-     flat       what matters is tilt off HORIZONTAL, both axes at once
-     upright    what matters is twist about the screen normal, one axis,
-                and WHICH axis depends on portrait vs landscape
+   FLAT, screen up (caster heading leg, toe): two axes, as a crosshair target
+   after Gyraline's. The thin lines are fixed; a thick HORIZONTAL bar rides
+   the phone's length (top-to-bottom tilt) and a thick VERTICAL bar rides its
+   width (side-to-side tilt). Put both on the crosshair and it is level both
+   ways at once. The bars cross at the 2-D tilt, so the green circle is
+   exactly the caster capture gate: resultant within HAND_LEVEL_TOL.
 
-   Used by camber, caster and toe, so no screen can drift out of step with
-   how its own captures are actually held. */
-function autoOrient(g){
+   UPRIGHT, screen out (camber, caster camber leg): one axis -- the twist
+   about the screen normal, "is it straight up and down" -- as one vertical
+   bar against a fixed centre line. (Camber is the OTHER axis, the lean along
+   the screen normal; that is the reading itself, not a hold error.)
+
+   Bars go to the HIGH side, like the bubble in a spirit level. They are drawn
+   in the phone's own frame, so the bar sits physically on the high side from
+   any viewpoint -- which is what makes a flat phone readable from beside the
+   wheel. Both modes use the same height, so the buttons below never jump.
+
+   Page rotation. Motion events report in the DEVICE frame (x to screen right,
+   y to the top), but the page can be drawn rotated: landscape, or a flat
+   phone that kept its last rotation. window.orientation (or
+   screen.orientation.angle) is how far the device is turned counter-clockwise
+   from portrait, and a device vector lands on the page rotated by that same
+   angle: at 90 the device's top points page-left, so (x,y) goes to (-y,x). */
+const PLUMB_TOL=1.5, LEVEL_FS=5, PLUMB_FS=5;
+const LV_COL={good:"#59d98c",warn:"#e8b84b",bad:"#e4606a"};
+function screenAngle(){
+  let a=0;
+  if(typeof window.orientation==="number")a=window.orientation;
+  else if(screen.orientation&&typeof screen.orientation.angle==="number")a=screen.orientation.angle;
+  return((a%360)+360)%360;
+}
+function levelDisplay(g,ang){
+  const r=R(ang||0),c=Math.cos(r),sn=Math.sin(r);
+  const rot=v=>[v[0]*c-v[1]*sn,v[0]*sn+v[1]*c];
   const m=casMount(g);
-  if(m==="flat")     return{err:handLevelErr(g),label:"level",tol:HAND_LEVEL_TOL};
-  if(m==="landscape")return{err:D(Math.asin(clamp(g[1],-1,1))),label:"plumb",tol:3};
-  return{err:liveRollError(g),label:"plumb",tol:3};   // portrait: calibrated zero applies
+  if(m==="flat"){
+    const a=levelVec(g);                        // [+ right edge low, + top low]
+    const p=rot([-a[0],-a[1]]);                 // toward the HIGH side; page coords, y up
+    return{mode:"flat",x:p[0],y:p[1],side:a[0],len:a[1],res:handLevelErr(g),tol:HAND_LEVEL_TOL,down:g[2]>0};
+  }
+  const portrait=(m==="portrait");
+  const rz=(typeof S!=="undefined"&&S.rollZero)||0;   // calibrated against g[0]: portrait only
+  const tw=portrait?D(Math.asin(clamp(g[0],-1,1)))-rz:D(Math.asin(clamp(g[1],-1,1)));
+  const ax=rot(portrait?[1,0]:[0,1]);           // where the twist axis lands on the page
+  const p=rot(portrait?[-tw,0]:[0,-tw]);        // toward the HIGH side
+  const horiz=Math.abs(ax[0])>=Math.abs(ax[1]);
+  return{mode:"plumb",horiz:horiz,s:horiz?p[0]:p[1],tw:tw,tol:PLUMB_TOL};
+}
+function lvCls(v,tol){v=Math.abs(v);return v<=tol?"good":v<=tol*2?"warn":"bad";}
+function drawLevel(svg,txt,g){
+  if(!svg)return null;
+  const d=levelDisplay(g,screenAngle());
+  const W=svg.clientWidth||320,H=svg.clientHeight||112,cx=W/2,cy=H/2;
+  let o="";
+  if(d.mode==="flat"){
+    const h=H/2-3,k=h/LEVEL_FS,inT=d.res<=d.tol,ta=d.tol/Math.SQRT2,L=h*0.8;
+    const bx=cx+clamp(d.x,-LEVEL_FS,LEVEL_FS)*k, by=cy-clamp(d.y,-LEVEL_FS,LEVEL_FS)*k;
+    o+=`<rect x="${cx-h}" y="${cy-h}" width="${2*h}" height="${2*h}" rx="10" fill="none" stroke="var(--face-line)" stroke-width="1.5"/>`;
+    o+=`<circle cx="${cx}" cy="${cy}" r="${d.tol*k}" fill="rgba(89,217,140,${inT?.30:.10})" stroke="rgba(89,217,140,.6)" stroke-width="1.2"/>`;
+    for(let v=1-LEVEL_FS;v<LEVEL_FS;v++){if(!v)continue;const q=v*k;
+      o+=`<line x1="${cx+q}" y1="${cy-3}" x2="${cx+q}" y2="${cy+3}" stroke="var(--face-mut)"/><line x1="${cx-3}" y1="${cy+q}" x2="${cx+3}" y2="${cy+q}" stroke="var(--face-mut)"/>`;}
+    o+=`<line x1="${cx-h}" y1="${cy}" x2="${cx+h}" y2="${cy}" stroke="var(--face-mut)" stroke-width="1.2"/>`+
+       `<line x1="${cx}" y1="${cy-h}" x2="${cx}" y2="${cy+h}" stroke="var(--face-mut)" stroke-width="1.2"/>`;
+    o+=`<line x1="${cx-L}" y1="${by}" x2="${cx+L}" y2="${by}" stroke="${LV_COL[lvCls(d.y,ta)]}" stroke-width="6" stroke-linecap="round"/>`+
+       `<line x1="${bx}" y1="${cy-L}" x2="${bx}" y2="${cy+L}" stroke="${LV_COL[lvCls(d.x,ta)]}" stroke-width="6" stroke-linecap="round"/>`+
+       `<circle cx="${bx}" cy="${by}" r="4.5" fill="${inT?LV_COL.good:"var(--face)"}" stroke="rgba(0,0,0,.45)"/>`;
+    if(txt)txt.innerHTML=d.down?"screen is facing <b>DOWN</b>":
+      "top\u2013bottom <b>"+Math.abs(d.len).toFixed(1)+"\u00b0</b> \u00b7 side\u2013side <b>"+Math.abs(d.side).toFixed(1)+"\u00b0</b>"+(inT?" \u2713":"");
+  }else{
+    const cls=lvCls(d.tw,d.tol),v=clamp(d.s,-PLUMB_FS,PLUMB_FS),ok=Math.abs(d.tw)<=d.tol;
+    const band=`rgba(89,217,140,${ok?.28:.10})`;
+    if(d.horiz){
+      const h=Math.min(W/2-14,160),k=h/PLUMB_FS,bx=cx+v*k,bt=d.tol*k;
+      o+=`<rect x="${cx-bt}" y="5" width="${2*bt}" height="${H-10}" rx="6" fill="${band}" stroke="rgba(89,217,140,.55)"/>`;
+      for(let t=1-PLUMB_FS;t<PLUMB_FS;t++){if(!t)continue;const x=cx+t*k;
+        o+=`<line x1="${x}" y1="3" x2="${x}" y2="10" stroke="var(--face-mut)"/><line x1="${x}" y1="${H-10}" x2="${x}" y2="${H-3}" stroke="var(--face-mut)"/>`;}
+      o+=`<line x1="${cx}" y1="2" x2="${cx}" y2="${H-2}" stroke="var(--face-mut)" stroke-width="1.2"/>`+
+         `<line x1="${bx}" y1="${H*0.13}" x2="${bx}" y2="${H*0.87}" stroke="${LV_COL[cls]}" stroke-width="6" stroke-linecap="round"/>`;
+    }else{
+      const h=H/2-4,k=h/PLUMB_FS,by=cy-v*k,bt=d.tol*k,Lh=Math.min(W/2-14,160);
+      o+=`<rect x="${cx-Lh}" y="${cy-bt}" width="${2*Lh}" height="${2*bt}" rx="6" fill="${band}" stroke="rgba(89,217,140,.55)"/>`+
+         `<line x1="${cx-Lh}" y1="${cy}" x2="${cx+Lh}" y2="${cy}" stroke="var(--face-mut)" stroke-width="1.2"/>`+
+         `<line x1="${cx-Lh*0.8}" y1="${by}" x2="${cx+Lh*0.8}" y2="${by}" stroke="${LV_COL[cls]}" stroke-width="6" stroke-linecap="round"/>`;
+    }
+    if(txt)txt.innerHTML="plumb <b>"+Math.abs(d.tw).toFixed(1)+"\u00b0</b>"+(ok?" \u2713":"");
+  }
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.innerHTML=o;
+  return d;
 }
 function setOrientAuto(elId,txtId,g){
-  const o=autoOrient(g);
-  setOrient(elId,txtId,o.err,o.label,o.tol);
-  return o;
+  const w=$(elId);if(!w)return null;
+  return drawLevel(w.querySelector("svg.lvl"),$(txtId),g);
 }
 function setOrient(elId,txtId,errDeg,label,tol){
   const el=$(elId);
@@ -3071,7 +3175,6 @@ function tick(){
       if(hand.leg===0){
         const lvl=handLevelErr(g);
         $("roCas").innerHTML=fmt(lvl,1)+'<span class="u">° off level</span>';
-        drawBubble($("bubCas"),lvl,{span:6,target:0,tol:HAND_LEVEL_TOL});
         setOrientAuto("orientCas","orientCasTxt",g);
         $("roCasA").textContent="heading "+(sensor.compassHeading==null?"–":Math.round(sensor.compassHeading)+"°");
         $("roCasB").textContent=(g[2]>=-0.85)?"lay the bar FLAT, screen UP"
@@ -3079,10 +3182,9 @@ function tick(){
       }else{
         const camb=(S.camSign[hand.wheel]||1)*tiltZ(g);
         $("roCas").innerHTML=fmt(camb)+'<span class="u">° camber</span>';
-        drawBubble($("bubCas"),camb,{span:6});
         setOrientAuto("orientCas","orientCasTxt",g);
-        $("roCasA").textContent="bar upright on the wheel face";
-        $("roCasB").textContent=handFaceOk(g)?"ready — capture it":"stand the bar UP";
+        $("roCasA").textContent="camber leg";
+        $("roCasB").textContent=handFaceOk(g)?"ready — capture":"stand the bar UP";
       }
       handUI();
     }else if(cas.run&&cas.phase>=2){
@@ -3133,6 +3235,7 @@ function tick(){
       $("roCasA").textContent=sensor.hasRot?"ready":"no gyro";
       $("roCasB").textContent="";
       drawBubble($("bubCas"),null,{span:S.sweepMode==="deg"?20:45});
+      setOrientAuto("orientCas","orientCasTxt",sensor.g);   // live before a run starts, too
     }
   }
   if(activeScr==="toe"&&sensor.on){
@@ -3236,6 +3339,7 @@ $("btnHandVoice").addEventListener("click",()=>{S.voiceOn=!S.voiceOn;store.set("
   }));
 })();
 function handModeUI(){
+  const bw=$("bubCas")&&$("bubCas").closest(".bubblewrap");if(bw)bw.style.display=handActive()?"none":"";
   const c=$("handCard"),o=$("casOldCard");
   if(c)c.style.display=handActive()?"":"none";
   if(o&&handActive())o.open=false;
@@ -3285,7 +3389,8 @@ if(!store.get("introDone",false))$("intro").hidden=false;
 toeSetMode(toe.mode);
 if(S.zero){$("zeroState").innerHTML="Gauge zero stored ("+fmt(S.zero.off)+"°) from "+new Date(S.zero.when).toLocaleString()+". Re-do after remounting the phone.";setChip("chipZero",true);}
 if(S.accelSign!==0&&S.gyroSign!==0)$("flatState").innerHTML="Flat check done earlier ✓ (redo any time).";
-if(S.rollZero||S.levelZero)$("levelZeroState").innerHTML="Stored: plumb "+fmt(S.rollZero)+"°, level "+fmt(S.levelZero)+"°.";
+if(S.rollZero||S.levelZero2)$("levelZeroState").innerHTML="Stored: plumb "+fmt(S.rollZero)+"°"+(S.levelZero2?", level "+fmt(S.levelZero2[1],1)+"° top–bottom / "+fmt(S.levelZero2[0],1)+"° side–side":"")+".";
+if(S.levelZero&&!S.levelZero2)$("levelZeroState").innerHTML+=" <b>Level zero is per-axis now — tap Zero level again to redo it.</b>";
 $("sessState").textContent="Session started "+new Date(S.sess.started).toLocaleString();
 migrateSess();
 camUI();casUI();toeRender();renderResults();
