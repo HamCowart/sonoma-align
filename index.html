@@ -203,12 +203,23 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     <details class="card"><summary>Vehicle · <span class="small" style="text-transform:none" id="hdrVehSum"></span></summary><div class="dbody">
       <div class="field" style="margin-top:8px">
         <label>Working on</label>
-        <select id="vehSel">
-          <option value="sonoma">1999 GMC Sonoma 2WD</option>
-          <option value="cayenne">Porsche Cayenne</option>
-          <option value="highlander">Toyota Highlander</option>
-          <option value="custom">Custom vehicle</option>
-        </select>
+        <select id="vehSel"></select>
+      </div>
+      <div class="btnrow" style="margin-top:8px">
+        <button class="btn" id="btnVehAdd">Add a vehicle</button>
+        <button class="btn ghost" id="btnVehDel">Delete this one</button>
+      </div>
+      <div id="vehAddForm" style="display:none;margin-top:10px">
+        <div class="field"><label>Name</label><input id="vehNewName" type="text" placeholder="e.g. 2014 F-150 4x4"></div>
+        <div class="grid2" style="margin-top:6px">
+          <div class="field"><label>Tire diameter ″</label><input id="vehNewTire" type="number" step="0.1" min="15" inputmode="decimal" value="28"></div>
+          <div class="field"><label>Track width ″</label><input id="vehNewTrack" type="number" step="0.5" min="20" inputmode="decimal" value="60"></div>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn primary" id="btnVehSave">Save vehicle</button>
+          <button class="btn ghost" id="btnVehCancel">Cancel</button>
+        </div>
+        <p class="hint" style="margin-top:6px">It joins the list straight away. Set its alignment targets in <b>Specs</b> below — they start from the blank-slate numbers.</p>
       </div>
       <p class="hint" style="margin-top:8px" id="vehNote"></p>
     </div></details>
@@ -594,6 +605,10 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <button class="btn" id="btnSaveSession">Save this session</button>
       </div>
       <div class="field" style="margin-top:8px">
+        <label>Vehicle label for this save</label>
+        <input id="sessVeh" type="text" placeholder="whatever you want this saved as">
+      </div>
+      <div class="field" style="margin-top:6px">
         <label>Notes for this session</label>
         <input id="sessNotes" type="text" placeholder="e.g. after new idler arm, shimmed LF +1/8&quot;">
       </div>
@@ -1101,6 +1116,7 @@ const PROFILES={
 /* ---------- state ---------- */
 const S={
   veh:store.get("veh","sonoma"),
+  myVeh:store.get("myVeh",{}),          // vehicles James adds himself, kept forever
   accelSign:store.get("accelSign",0),   // +1 spec/Android, −1 iOS-style, 0 unknown (assume iOS)
   gyroSign:store.get("gyroSign",0),
   gyroScale:store.get("gyroScale",1),   // corrects a real-device rotationRate scale error; learned via compass when available
@@ -1132,7 +1148,50 @@ function migrateSess(){
 function blankSess(){return{started:Date.now(),veh:S.veh,cam:{},cas:{},toeF:null,toeR:null,toeLF:null,toeRF:null,toeMethod:null,frameCenterline:null,frameVsThrust:null,railStraightL:null,railStraightR:null};}
 if(!S.sess)S.sess=blankSess();
 function saveSess(){store.set("sess2",S.sess);}
-function prof(){return PROFILES[S.veh]||PROFILES.custom;}
+/* Built-ins plus whatever he has added. A vehicle he types in is a first
+   class citizen: it lives in the dropdown, carries its own specs, and is what
+   a saved session is labelled with -- nothing is assumed about which truck is
+   on the jack. */
+function allProfiles(){return Object.assign({},PROFILES,S.myVeh);}
+function prof(){return PROFILES[S.veh]||S.myVeh[S.veh]||PROFILES.custom;}
+function saveMyVeh(){store.set("myVeh",S.myVeh);}
+function vehListUI(){
+  const sel=$("vehSel"); if(!sel)return;
+  const all=allProfiles();
+  sel.innerHTML=Object.keys(all).map(k=>
+    '<option value="'+k+'">'+String(all[k].name).replace(/[<>&]/g,"")+'</option>').join("");
+  sel.value=S.veh in all?S.veh:"sonoma";
+  const del=$("btnVehDel");
+  if(del)del.disabled=!(S.veh in S.myVeh);
+}
+function vehAddShow(on){
+  const f=$("vehAddForm"); if(!f)return;
+  f.style.display=on?"":"none";
+  if(on){$("vehNewName").value="";$("vehNewName").focus();}
+}
+function vehAddSave(){
+  const name=$("vehNewName").value.trim();
+  if(!name){toast("Give it a name");return;}
+  const tire=parseFloat($("vehNewTire").value), track=parseFloat($("vehNewTrack").value);
+  if(!isFinite(tire)||tire<=0||!isFinite(track)||track<=0){toast("Tire and track need numbers");return;}
+  const base=PROFILES.custom;
+  let id="v"+Object.keys(S.myVeh).length;
+  while(id in allProfiles())id+="x";
+  S.myVeh[id]={name:name,short:name.length>18?name.slice(0,18):name,
+    tire:tire,track:track,
+    spec:Object.assign({},base.spec),rearAdjustable:base.rearAdjustable,
+    note:"Added by you — set its targets in Specs below.",
+    advCamber:base.advCamber,advCaster:base.advCaster,advToe:base.advToe};
+  saveMyVeh();vehAddShow(false);vehListUI();vehChange(id);
+  toast("Added "+name);
+}
+function vehDelete(){
+  if(!(S.veh in S.myVeh)){toast("Built-in vehicles can’t be deleted");return;}
+  const nm=S.myVeh[S.veh].name;
+  delete S.myVeh[S.veh];delete S.specs[S.veh];
+  saveMyVeh();saveSpecs();vehListUI();vehChange("sonoma");
+  toast("Deleted "+nm);
+}
 function spec(){ if(!S.specs[S.veh])S.specs[S.veh]={...prof().spec,tire:prof().tire,track:prof().track}; return S.specs[S.veh]; }
 function trackIn(){return spec().track||prof().track||55.5;}
 function barIn(){return Math.max(6,S.barLen||48);}
@@ -2716,6 +2775,7 @@ function verdict(val,target,tol){
   return d>0?{cls:"high",txt:"HIGH "+fmt(d,2)}:{cls:"low",txt:"LOW "+fmt(d,2)};
 }
 function renderResults(){
+  sessVehUI();
   const sp=spec(),c=S.sess.cam,k=S.sess.cas,p=prof();
   const body=$("resTable").querySelector("tbody");
   const row=(name,lf,rf,specTxt,v)=>`<tr><td>${name}</td><td class="num">${lf}</td><td class="num">${rf}</td><td class="num">${specTxt}</td><td>${v}</td></tr>`;
@@ -2801,14 +2861,22 @@ async function copyReport(){const txt=reportText();try{await navigator.clipboard
 /* A saved session is worth nothing six months later if it does not say WHICH
    TRUCK and WHY. Date alone cannot tell "before the idler arm" from "after". */
 function archiveSession(){
-  const n=$("sessNotes");
+  const n=$("sessNotes"), v=$("sessVeh");
   const notes=n?n.value.trim():"";
-  S.past.unshift({when:Date.now(),veh:S.veh,vehName:prof().short,notes:notes,text:reportText()});
+  // The label is HIS, not an assumption: whatever is in the box wins, and it
+  // is only pre-filled from the selected profile as a convenience.
+  const label=(v&&v.value.trim())||prof().name||"";
+  S.past.unshift({when:Date.now(),veh:S.veh,vehName:label,notes:notes,text:reportText()});
   S.past=S.past.slice(0,24);
   store.set("past",S.past);
   if(n)n.value="";
-  toast("Saved: "+prof().short+(notes?" · "+notes.slice(0,30):""));
+  if(v)v.value="";
+  toast("Saved"+(label?": "+label:"")+(notes?" · "+notes.slice(0,28):""));
   renderPast();
+}
+function sessVehUI(){
+  const v=$("sessVeh"); if(!v)return;
+  if(!v.value)v.placeholder=prof().name||"name this save";
 }
 function renderPast(){
   const el=$("pastList");
@@ -2841,7 +2909,7 @@ function specLoad(){const sp=spec();for(const id in specMap)$(id).value=sp[specM
 function specSave(){const sp=spec();for(const id in specMap){const v=parseFloat($(id).value);if(!isNaN(v))sp[specMap[id]]=v;}saveSpecs();renderResults();}
 function vehApply(){
   const p=prof();
-  $("vehSel").value=S.veh;
+  vehListUI();
   $("hdrVeh").textContent=p.short+" · phone alignment gauge";
   const vs=$("hdrVehSum");if(vs)vs.textContent=p.short;
   $("specVehName").textContent=p.short;
@@ -3042,6 +3110,11 @@ function show(scr){
 }
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>show(t.dataset.scr)));
 $("vehSel").addEventListener("change",e=>vehChange(e.target.value));
+$("btnVehAdd").addEventListener("click",()=>vehAddShow(true));
+$("btnVehCancel").addEventListener("click",()=>vehAddShow(false));
+$("btnVehSave").addEventListener("click",vehAddSave);
+$("btnVehDel").addEventListener("click",vehDelete);
+vehListUI();
 $("btnEnable").addEventListener("click",enableSensors);
 $("btnFlatCheck").addEventListener("click",flatCheck);
 $("btnFlipAccel").addEventListener("click",()=>{S.accelSign=(S.accelSign||-1)*-1;store.set("accelSign",S.accelSign);toast("Tilt sign flipped");refreshDiag();});
