@@ -157,6 +157,8 @@ li{margin:4px 0}
 svg.diagram{width:100%;height:auto;display:block;margin:8px 0}
 svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+
+#scr-setup details.card{scroll-margin-top:60px}
 </style>
 
 <header>
@@ -198,8 +200,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 <section class="screen" id="scr-setup">
   <div class="stack">
 
-    <div class="card">
-      <h2>Vehicle</h2>
+    <details class="card"><summary>Vehicle · <span class="small" style="text-transform:none" id="hdrVehSum"></span></summary><div class="dbody">
       <div class="field" style="margin-top:8px">
         <label>Working on</label>
         <select id="vehSel">
@@ -210,10 +211,9 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         </select>
       </div>
       <p class="hint" style="margin-top:8px" id="vehNote"></p>
-    </div>
+    </div></details>
+    <details id="sensorCard" class="card" open><summary>1 · Turn on the sensors</summary><div class="dbody">
 
-    <div class="card" id="sensorCard">
-      <h2>1 · Turn on the sensors</h2>
       <p class="hint">The phone’s tilt and rotation sensors do all the measuring — on an iPhone this is the same fused motion data the built-in Measure app uses, the best available to any app. iPhone asks permission once per visit.</p>
       <div style="margin-top:10px">
         <button class="btn primary big" id="btnEnable">Enable motion sensors</button>
@@ -231,11 +231,10 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <p style="margin-top:6px">Only use the flip buttons if a guided check tells you a reading moves the wrong way.</p>
       <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnResetCal">Reset turn calibration</button></div>
       <p style="margin-top:6px">If flat check ever hangs or acts strangely, tap this once to clear the learned turn scale/sign, then run flat check again from a clean slate.</p></div></details>
-    </div>
+    </div></details>
 
-    <div class="card">
-      <h2>2 · Flat check <span class="small" style="text-transform:none;letter-spacing:0">(15 seconds, once per phone)</span></h2>
-      <p class="hint">Teaches the app which way your phone’s sensors point. Lay the phone <b>flat on a table, screen up</b>, tap the button, hold still — then when asked, spin it <b>at least a quarter turn</b> either direction (looking down at the screen) while it stays flat on the table, then tap <b>Done spinning</b>.</p>
+    <details class="card"><summary>2 · Flat check <span class="small" style="text-transform:none;letter-spacing:0">(15 seconds, once per phone)</span></summary><div class="dbody">
+
       <div style="margin-top:10px"><button class="btn big" id="btnFlatCheck">Start flat check</button></div>
       <div class="mono" id="flatSpinReadout" style="display:none;text-align:center;font-size:34px;font-weight:600;color:var(--acc);margin-top:10px">0°</div>
       <div style="margin-top:8px"><button class="btn primary big" id="btnFlatDone" style="display:none">Done spinning</button></div>
@@ -244,11 +243,13 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <button class="btn" id="btnFlatCW">↻ I turned it RIGHT</button>
       </div>
       <div class="hint" id="flatState" style="margin-top:8px"></div>
-    </div>
+      <details style="margin-top:10px"><summary>Why this step, in detail</summary><div class="dbody">
+      <p class="hint">Teaches the app which way your phone’s sensors point. Lay the phone <b>flat on a table, screen up</b>, tap the button, hold still — then when asked, spin it <b>at least a quarter turn</b> either direction (looking down at the screen) while it stays flat on the table, then tap <b>Done spinning</b>.</p>
+      </div></details>
+    </div></details>
 
-    <div class="card">
-      <h2>2b · Zero against a level <span class="small" style="text-transform:none;letter-spacing:0">(optional, once per phone)</span></h2>
-      <p class="hint">The gauge-zero step below cancels bar and mounting error for camber, but nothing else corrects a phone that simply reads a couple of degrees off <b>even by itself</b> — for example the <b>plumb</b>/<b>level</b> dots on Camber, Caster, and Toe. If you have a trusted digital level, use it here once to zero that out for good.</p>
+    <details class="card"><summary>2b · Zero against a level <span class="small" style="text-transform:none;letter-spacing:0">(optional, once per phone)</span></summary><div class="dbody">
+
       <div class="steps" style="margin-top:10px">
         <div class="step"><div class="stepn">1</div><div class="stept">Hold the bare phone <b>upright</b> (portrait, like on the wheel) flush against your digital level, both reading the same true-vertical surface. Confirm the level itself reads <b>0.0°</b>, hold still, tap <b>Zero plumb</b>.</div></div>
         <div class="step"><div class="stepn">2</div><div class="stept">Lay the phone <b>flat</b> against the level on a level-confirmed flat surface, hold still, tap <b>Zero level</b>.</div></div>
@@ -262,10 +263,13 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <button class="btn ghost" id="btnResetLevel">Reset level</button>
       </div>
       <div class="hint" id="levelZeroState" style="margin-top:8px"></div>
-    </div>
+      <details style="margin-top:10px"><summary>Why this step, in detail</summary><div class="dbody">
+      <p class="hint">The gauge-zero step below cancels bar and mounting error for camber, but nothing else corrects a phone that simply reads a couple of degrees off <b>even by itself</b> — for example the <b>plumb</b>/<b>level</b> dots on Camber, Caster, and Toe. If you have a trusted digital level, use it here once to zero that out for good.</p>
+      </div></details>
+    </div></details>
 
-    <div class="card">
-      <h2>3 · Zero the gauge</h2>
+    <details class="card"><summary>3 · Zero the gauge</summary><div class="dbody">
+
       <p class="hint">Cancels the small built-in lean of your phone and the gauge bar. Do this <b>once each time you mount the phone</b> in the bar. Hold the bar on any wheel, upright (feet at 12 and 6 o’clock), and follow the three captures.</p>
       <div class="steps" style="margin-top:10px" id="zeroSteps">
         <div class="step" id="zstep1"><div class="stepn">1</div><div class="stept">Bar upright on the wheel (feet 12 and 6), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Hold still, it captures itself.</div></div>
@@ -278,12 +282,10 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <button class="btn ghost" id="btnZeroReset">Reset</button>
       </div>
       <div class="hint" id="zeroState" style="margin-top:8px">No gauge zero stored.</div>
-    </div>
+    </div></details>
 
-    <div class="card">
-      <h2>4 · Measure the floor</h2>
-      <p class="hint">The fix for a floor that isn’t level. A sideways slope leans the whole vehicle, which shifts every camber reading. <b>Caster and toe don’t need this</b> — the way they’re measured cancels floor slope out.</p>
-      <p class="hint">What tilts the truck is the <b>height difference between the two tire contact patches</b> — not how the concrete happens to slope at any one spot. So you bridge straight across between the tires on a long straight edge that only touches at its two ends, and read the slope of that. High spots in between can’t lift it and dips in between can’t fool it.</p>
+    <details class="card"><summary>4 · Measure the floor</summary><div class="dbody">
+
       <div class="grid2" style="margin-top:10px">
         <div class="field"><label>Straight edge ″</label><input id="barLen" type="number" step="1" min="12" inputmode="decimal"></div>
         <div class="field"><label>Track width ″</label><input id="trackW" type="number" step="0.5" min="20" inputmode="decimal"></div>
@@ -304,7 +306,11 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <p>If you leave the blocks loose on the floor and just flip the edge onto them, the mismatch stays put and becomes part of the answer: <span id="shimErrNote"></span> Tape them on and stop thinking about it.</p>
       </div></details>
       <p class="small" style="margin-top:6px">Measure the rear-axle line too if you’ll be doing rear camber. Re-measure whenever the vehicle gets rolled to a new spot.</p>
-    </div>
+      <details style="margin-top:10px"><summary>Why this step, in detail</summary><div class="dbody">
+      <p class="hint">The fix for a floor that isn’t level. A sideways slope leans the whole vehicle, which shifts every camber reading. <b>Caster and toe don’t need this</b> — the way they’re measured cancels floor slope out.</p>
+      <p class="hint">What tilts the truck is the <b>height difference between the two tire contact patches</b> — not how the concrete happens to slope at any one spot. So you bridge straight across between the tires on a long straight edge that only touches at its two ends, and read the slope of that. High spots in between can’t lift it and dips in between can’t fool it.</p>
+      </div></details>
+    </div></details>
 
     <div class="card">
       <h2>Target specs — <span id="specVehName"></span></h2>
@@ -356,14 +362,17 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <div class="spread"><h2>Capture a wheel</h2><span class="small">+ leans out · − leans in</span></div>
-      <p class="hint"><b>Phone placement:</b> bar <b>upright</b> on the wheel lip (feet at 12 and 6 o’clock), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Same hold as the camber leg of a caster run, so nothing has to move between them. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
-      <p class="hint"><b>Take three or four readings per wheel, lifting the phone off the bar and re-seating it between each one.</b> Every tap adds a reading rather than replacing the last, and the tile shows the average, how far the readings scattered, and how tight that average is. Holding the phone by hand means each placement sits a little differently — that scatter is the real error here, and one reading can never show it to you. Tapping again <i>without</i> re-seating measures nothing new.</p>
+      <div class="note" style="margin-top:8px;margin-bottom:10px">Bar <b>UPRIGHT</b> on the wheel lip (feet 12 &amp; 6) · <b>screen OUT</b> · <b>top UP</b>. Tap the wheel you are on, hold still, capture on green. <b>Three or four per wheel</b>, re-seating the bar each time.</div>
       <div class="wheels" style="margin-top:10px">
         <div class="wtile"><div class="wname">LF · driver</div><div class="wval mono" id="camLFv">–</div><div class="wsub" id="camLFs"></div><button class="btn primary" data-camcap="LF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LF">clear</button></div>
         <div class="wtile"><div class="wname">RF · passenger</div><div class="wval mono" id="camRFv">–</div><div class="wsub" id="camRFs"></div><button class="btn primary" data-camcap="RF">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RF">clear</button></div>
         <div class="wtile"><div class="wname">LR · rear</div><div class="wval mono" id="camLRv">–</div><div class="wsub" id="camLRs"></div><button class="btn" data-camcap="LR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="LR">clear</button></div>
         <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RR">clear</button></div>
       </div>
+      <details style="margin-top:10px"><summary>How to hold it, and why three readings</summary><div class="dbody">
+      <p class="hint"><b>Phone placement:</b> bar <b>upright</b> on the wheel lip (feet at 12 and 6 o’clock), <b>screen facing OUT</b> — away from the truck — <b>top of phone UP</b>. Same hold as the camber leg of a caster run, so nothing has to move between them. Tap the wheel you’re on first so the live number uses the right side, hold still, capture when the steady light is green. The <b>plumb</b> dot below the readout only watches <b>side-to-side twist</b> — leaning the bar forward/back is the camber reading itself, so plumb won’t (and shouldn’t) react to that; it flags if you’re holding it rotated sideways.</p>
+      <p class="hint"><b>Take three or four readings per wheel, lifting the phone off the bar and re-seating it between each one.</b> Every tap adds a reading rather than replacing the last, and the tile shows the average, how far the readings scattered, and how tight that average is. Holding the phone by hand means each placement sits a little differently — that scatter is the real error here, and one reading can never show it to you. Tapping again <i>without</i> re-seating measures nothing new.</p>
+      </div></details>
       <details><summary>First time? Set the lean direction</summary><div class="dbody">
         With the bar held on a wheel, <b>tip the top of the bar away from the vehicle</b>. The live number should go <b>up</b>. If it goes down, tap the button for the side you’re on — the app remembers.
         <div class="btnrow" style="margin-top:8px">
@@ -511,7 +520,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
     <div class="card">
       <div class="spread"><h2>Gyro toe</h2><span class="pill na">±0.05–0.15°</span></div>
-      <p class="hint"><b>Phone placement:</b> bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>screen facing OUT</b> — away from the truck — and <b>top of phone toward the front bumper on every wheel</b>. Screen direction is not fussy here the way it is elsewhere: this carry runs on the <b>gyro</b>, which is blind to magnets and to how the phone is rolled, so only the two feet on the rim and the top pointing forward actually set the reading. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
+      <div class="note" style="margin-top:8px;margin-bottom:10px">Bar <b>HORIZONTAL</b> across the wheel (feet 3 &amp; 9) · <b>screen OUT</b> · <b>top at the BUMPER on every wheel</b>. Carry it smoothly — no flips, no spins.</div>
       <div class="btnrow" style="margin-top:10px">
         <button class="btn" id="btnToeModeF">Front only</button>
         <button class="btn sel" id="btnToeModeA">All 4 wheels</button>
@@ -528,6 +537,9 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <thead><tr><th>#</th><th>Front</th><th>Rear</th><th>LF/RF split</th><th>Drift</th><th></th></tr></thead><tbody></tbody>
       </table></div>
       <div class="hint" id="toeAvg" style="margin-top:6px"></div>
+      <details style="margin-top:10px"><summary>How the carry works, and why the screen direction is free here</summary><div class="dbody">
+      <p class="hint"><b>Phone placement:</b> bar <b>horizontal</b> across the wheel (feet at 3 and 9 o’clock), <b>screen facing OUT</b> — away from the truck — and <b>top of phone toward the front bumper on every wheel</b>. Screen direction is not fussy here the way it is elsewhere: this carry runs on the <b>gyro</b>, which is blind to magnets and to how the phone is rolled, so only the two feet on the rim and the top pointing forward actually set the reading. The gyro carries the pointing angle from wheel to wheel; revisiting the first wheel at the end measures the sensor’s drift so it can be subtracted. Carry the bar smoothly — no flips, no spins. The <b>level</b> dot below the readout stays live through the whole carry, not just at each stop.</p>
+      </div></details>
       <div id="frameBlock" style="display:none;margin-top:10px" class="hint"><div id="frameOut"></div></div>
       <div class="note warn" style="margin-top:8px">Toe tolerances are about a tenth of a degree — the edge of what a phone gyro does. Run <b>3 passes</b> and trust the average; sanity-check with the tape method before final tightening.</div>
     </div>
@@ -1671,15 +1683,16 @@ let floorBusy=false, floorStop=false;
 function floorStepsUI(active=0){
   const L=barIn(), T=Math.max(20,trackIn());
   const steps=[
-    "<b>Tape a block of the same thickness under each end</b> of the straight edge, so the middle hangs clear of the floor. Anything consistent works — two washers, two nuts, two scraps of the same plywood. They want to be <i>attached to the edge</i>, not left loose on the floor (see below).",
-    "Set it <b>across the truck between the two tire contact patches</b>, blocks down, centred on the span, <b>top of phone toward the passenger side</b>. Nothing but the two blocks touching. Hold still.",
-    "<b>Pick it up and turn it end for end</b> — same footprint, blocks back in the same two spots, top of phone now toward the driver side. Hold still. That pair is what cancels the phone’s own zero error."
+    "<b>Equal-thickness blocks taped under each end</b> of the edge — middle clear of the floor.",
+    "<b>Across the truck between the tire contact patches</b>, blocks down, centred · <b>top of phone to the PASSENGER side</b>. Hold still.",
+    "<b>Turn it end for end</b> — blocks back in the same two spots · <b>top of phone to the DRIVER side</b>. Hold still."
   ];
   let h="";
   for(let i=1;i<=steps.length;i++)
     h+='<div class="step'+(i===active?" now":"")+'" id="fstep'+i+'"><div class="stepn">'+i+'</div><div class="stept">'+steps[i-1]+'</div></div>';
   h+='<p class="small" style="margin-top:6px">Reading the slope over '+L+'″ and applying it across a '+T+'″ track'+
      (L<T?" — centre the edge between the tires so the bit you skip is split evenly at both ends.":".")+'</p>';
+  h+='<details style="margin-top:8px"><summary>Why blocks, and why turn it round</summary><div class="dbody">'+"The blocks must be <b>attached to the edge</b>, not loose on the floor — two washers, two nuts, two scraps of the same plywood, anything consistent. Turning the edge end for end and averaging the pair is what cancels the phone’s own zero error, which is otherwise indistinguishable from real floor slope."+'</div></details>';
   $("floorSteps").innerHTML=h;
 }
 function waitSteadyOrStop(preMs){
@@ -2739,6 +2752,7 @@ function vehApply(){
   const p=prof();
   $("vehSel").value=S.veh;
   $("hdrVeh").textContent=p.short+" · phone alignment gauge";
+  const vs=$("hdrVehSum");if(vs)vs.textContent=p.short;
   $("specVehName").textContent=p.short;
   $("vehNote").textContent=p.note;
   $("specNote").textContent=p.note;
@@ -2958,6 +2972,23 @@ $("btnHandRF").addEventListener("click",()=>handStart("RF"));
 $("btnHandVoice").addEventListener("click",()=>{S.voiceOn=!S.voiceOn;store.set("voiceOn",S.voiceOn);casVoiceUI();if(!S.voiceOn)hush();});
 // The compact card IS the hand-held mode; in any other mode it would be a
 // dead panel sitting above the controls that actually apply.
+/* Setup is six separate one-time jobs stacked vertically, so reaching step 3
+   meant scrolling past everything above it. Opening one now closes the others
+   and scrolls it to the top, which is the only way its controls are reliably
+   on screen whatever is above. */
+(function setupAccordion(){
+  const cards=[...document.querySelectorAll('#scr-setup details.card')];
+  cards.forEach(d=>d.addEventListener("toggle",()=>{
+    if(!d.open)return;
+    cards.forEach(o=>{if(o!==d)o.open=false;});
+    // scrollIntoView rather than hand-computed scrollTop: this page's
+    // scrolling element is the BODY, not documentElement, and the offset is
+    // handled by scroll-margin-top so the sticky header cannot cover it.
+    // setTimeout, not requestAnimationFrame: rAF is throttled whenever the
+    // page is not actively rendering, and the scroll then silently never runs.
+    setTimeout(()=>{d.scrollIntoView(true);},0);
+  }));
+})();
 function handModeUI(){
   const c=$("handCard"),o=$("casOldCard");
   if(c)c.style.display=handActive()?"":"none";
