@@ -174,6 +174,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 
 .face .row2 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #lvlCam{height:64px}   /* camber is always an upright hold: one axis needs no square */
+.btn.arm{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
 </style>
 
 <header>
@@ -322,6 +323,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
       <div class="btnrow" style="margin-top:6px">
         <button class="btn primary" id="btnFloorGo">Measure front axle</button>
         <button class="btn" id="btnFloorGoR">Measure rear axle</button>
+        <button class="btn" id="btnFloorGoP">Measure fore-aft (caster)</button>
         <button class="btn ghost" id="btnFloorStop">Stop</button>
         <button class="btn ghost" id="btnFloorZeroOut">Assume level</button>
       </div>
@@ -705,7 +707,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         </tbody>
       </table>
       </div>
-      <p class="hint" style="margin-top:8px"><b>Why the screen direction keeps changing.</b> Camber is gravity along the <b>screen normal</b>, so that axis has to point out through the wheel — and rolling the phone about it changes nothing, which is why camber never cares whether the top is up or sideways. A compass heading is built from the two <b>horizontal</b> axes, so the phone has to lie <b>flat</b>: that puts the screen-normal axis vertical and out of the answer, which matters because on a wheel it is aimed straight through the cast-iron brake rotor. Tilt it 2° and 3.5% of that iron leaks back into the heading; hold it against the wheel face and you get 100% of it. The gyro is the odd one out — blind to magnets and to roll — so the toe carry only cares where the feet sit and which way the top points.</p>
+      <p class="hint" style="margin-top:8px"><b>Why the screen direction keeps changing.</b> Camber is gravity along the <b>screen normal</b>, so that axis has to point out through the wheel — and rolling the phone about it changes nothing, which is why camber never cares whether the top is up or sideways. A heading is read with the bar <b>flat</b> so that it is the bar’s own direction being measured. That does <b>not</b> shield the compass from the hub and rotor: iOS works out heading from the whole field around the phone, whichever way it faces, and that iron steers with the wheel. Distance from the hub helps; the tape-measured lock angles are the independent check, and every caster run is compared against them when they are stored. The gyro is the odd one out — blind to magnets and to roll — so the toe carry only cares where the bar sits and which way the top points.</p>
       <p class="hint"><b>The two that look wrong but are not.</b> Gauge zero step 3 turns the screen <i>toward</i> the wheel on purpose: flipping it is how the routine separates your phone’s built-in lean from the bar’s. And the caster heading leg is the only capture where turning the phone end-for-end matters — it reads as a 180° steer and the run is refused. Everywhere else, which way round it sits is free.</p>
 
       <h2>Day-of checklist</h2>
@@ -792,7 +794,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
    with θ>0 = steer left:
      γ = (camb(θL) − camb(θR)) / (sinθL − sinθR),  θL>0, θR<0.
    Constant offsets (gauge zero, floor lean) cancel in the difference.
-   Even part gives SAI (diagnostic): σ ≈ −(cL+cR−2c0)/((1−cosθL)+(1−cosθR)).
+   Even part gives SAI (diagnostic): σ ≈ +(cL+cR−2c0)/((1−cosθL)+(1−cosθR)).
    Steer angle = yaw about earth-vertical integrated from rotationRate:
      ψ̇ = −(ω⃗·ĝ)·gs·sc   (+ = counter-clockwise from above = steering left),
    gyro bias sampled during the still start; sign gs and scale sc both come
@@ -864,7 +866,8 @@ function gyroCalFrom(calRaw,compassDelta,opts={}){
    and inboard by SAI S swings the wheel's camber by, exactly in θ and to first
    order in C and S (Rodrigues about the steering axis):
 
-       camber(θ) − camber(0) = C·sinθ − S·(1−cosθ)
+       camber(θ) − camber(0) = C·sinθ + S·(1−cosθ)   (SAI tips the top OUT either way;
+       this read "− S" until 2026-09-23, so older SAI numbers were negated)
 
    Note what is and isn't approximated: it is linear in C and S, which are a
    few degrees, but it is EXACT in θ. Large sweeps do not break this formula.
@@ -893,7 +896,7 @@ function casterFrom(thL,cL,thR,cR,c0){
   const dL=cL-(c0||0),dR=cR-(c0||0);
   const det=sR*uL-sL*uR;
   if(Math.abs(det)<1e-6)return null;                   // both stops on the same side
-  return{caster:(uL*dR-uR*dL)/det, sai:(sL*dR-sR*dL)/det};
+  return{caster:(uL*dR-uR*dL)/det, sai:(sR*dL-sL*dR)/det};
 }
 
 /* Where the steer angle comes from, and why it stopped coming from the gyro.
@@ -1036,7 +1039,7 @@ function solve3(A,b){   // 3x3 Gauss-Jordan with partial pivoting
 function lsqCaster(pts){
   const n=pts.length;
   if(n<3)return null;
-  const X=pts.map(q=>[1,Math.sin(R(q.th)),-(1-Math.cos(R(q.th)))]);
+  const X=pts.map(q=>[1,Math.sin(R(q.th)),(1-Math.cos(R(q.th)))]);   // +S: SAI tips the top OUT either way
   const A=[[0,0,0],[0,0,0],[0,0,0]],b=[0,0,0];
   for(let k=0;k<n;k++)for(let i=0;i<3;i++){
     b[i]+=X[k][i]*pts[k].camb;
@@ -1159,11 +1162,24 @@ function migrateSess(){
     if(m&&!m.samples&&m.raw!=null){const v=camStat([m.raw]);v.when=m.when||v.when;S.sess.cam[w]=v;ch=true;}}
   for(const w in S.sess.cas){const m=S.sess.cas[w];
     if(m&&!m.sweeps&&m.caster!=null){const v=casStat([{caster:m.caster,sai:m.sai,thL:m.thL,thR:m.thR,c0:m.c0}]);v.when=m.when||v.when;S.sess.cas[w]=v;ch=true;}}
+  // One-time: SAI was fitted with the wrong sign before 2026-09-23.
+  if(!store.get("saiSignFixed",false)){
+    for(const w in S.sess.cas){const m=S.sess.cas[w];
+      if(m&&m.sweeps){m.sweeps.forEach(x=>{if(x.sai!=null)x.sai=-x.sai;if(x.tape&&x.tape.sai!=null)x.tape.sai=-x.tape.sai;});
+        const v=casStat(m.sweeps);v.when=m.when||v.when;S.sess.cas[w]=v;ch=true;}}
+    store.set("saiSignFixed",true);
+  }
   if(ch)saveSess();
 }
 function blankSess(){return{started:Date.now(),veh:S.veh,cam:{},cas:{},toeF:null,toeR:null,toeLF:null,toeRF:null,toeMethod:null,frameCenterline:null,frameVsThrust:null,railStraightL:null,railStraightR:null};}
 if(!S.sess)S.sess=blankSess();
 function saveSess(){store.set("sess2",S.sess);}
+/* The old test (camber or front toe present) missed caster-only sessions --
+   the slowest data in the app to collect -- so "Start fresh session" deleted
+   them unsaved and a vehicle switch carried them onto the next vehicle. */
+function sessHasData(s){return !!(s&&(Object.keys(s.cam||{}).length||Object.keys(s.cas||{}).length||s.toeF!=null||s.toeR!=null||s.toeLF!=null||s.frameCenterline!=null));}
+function sessSig(s){return JSON.stringify([s.cam,s.cas,s.toeF,s.toeR,s.toeLF,s.toeRF,s.frameCenterline]);}
+function sessUnsaved(){return sessHasData(S.sess)&&S.sess.archivedSig!==sessSig(S.sess);}
 /* Built-ins plus whatever he has added. A vehicle he types in is a first
    class citizen: it lives in the dropdown, carries its own specs, and is what
    a saved session is labelled with -- nothing is assumed about which truck is
@@ -1191,8 +1207,10 @@ function vehAddSave(){
   const tire=parseFloat($("vehNewTire").value), track=parseFloat($("vehNewTrack").value);
   if(!isFinite(tire)||tire<=0||!isFinite(track)||track<=0){toast("Tire and track need numbers");return;}
   const base=PROFILES.custom;
-  let id="v"+Object.keys(S.myVeh).length;
-  while(id in allProfiles())id+="x";
+  // Never reuse an id: a deleted vehicle's floor slope or stop angles left
+  // under the same key would silently apply to the new one.
+  let id="v"+Date.now().toString(36);
+  while(id in allProfiles()||(S.floors&&id in S.floors)||(S.stops&&id in S.stops)||(S.specs&&id in S.specs))id+="x";
   S.myVeh[id]={name:name,short:name.length>18?name.slice(0,18):name,
     tire:tire,track:track,
     spec:Object.assign({},base.spec),rearAdjustable:base.rearAdjustable,
@@ -1202,10 +1220,12 @@ function vehAddSave(){
   toast("Added "+name);
 }
 function vehDelete(){
-  if(!(S.veh in S.myVeh)){toast("Built-in vehicles can’t be deleted");return;}
-  const nm=S.myVeh[S.veh].name;
-  delete S.myVeh[S.veh];delete S.specs[S.veh];
-  saveMyVeh();saveSpecs();vehListUI();vehChange("sonoma");
+  if(!(S.veh in S.myVeh)){toast("Built-in vehicles can\u2019t be deleted");return;}
+  const id=S.veh,nm=S.myVeh[id].name;
+  vehChange("sonoma");   // archive anything open under the RIGHT name first
+  delete S.myVeh[id];delete S.specs[id];
+  if(S.floors)delete S.floors[id];if(S.stops)delete S.stops[id];
+  saveMyVeh();saveSpecs();store.set("floors",S.floors);saveStops();vehListUI();
   toast("Deleted "+nm);
 }
 function spec(){ if(!S.specs[S.veh])S.specs[S.veh]={...prof().spec,tire:prof().tire,track:prof().track}; return S.specs[S.veh]; }
@@ -1377,10 +1397,18 @@ function onMotion(e){
     sensor.hasRot=true;
     sensor._rot=[r.beta||0,r.gamma||0,r.alpha||0]; // about x, y, z — deg/s per spec
     if(sensor.yawRun){
-      const dt=sensor.lastEvt?Math.min((now-sensor.lastEvt)/1000,0.1):0.016;
+      /* A gap in the event stream (screen locked, app switched, a busy main
+         thread) used to be clamped to 0.1 s and the rest silently dropped:
+         whatever the phone turned meanwhile just vanished from the toe.
+         Short hiccups are now integrated over their real length (trapezoid,
+         rate at both ends); over 0.5 s the rotation is unknowable, so it is
+         flagged and a toe pass refuses to finish on it. */
+      const raw=sensor.lastEvt?(now-sensor.lastEvt)/1000:0.016;
       const w=sensor._rot,b=sensor.gyroBias,gs=(S.gyroSign||1),sc=(S.gyroScale||1);
       const wz=((w[0]-b[0])*sensor.g[0]+(w[1]-b[1])*sensor.g[1]+(w[2]-b[2])*sensor.g[2]);
-      sensor.yaw+=(-wz*gs*sc)*dt;
+      if(raw>0.5)sensor.yawGap=Math.max(sensor.yawGap||0,raw);
+      else{const wp=(sensor._wzPrev!=null)?sensor._wzPrev:wz;sensor.yaw+=(-(wz+wp)/2*gs*sc)*raw;}
+      sensor._wzPrev=wz;
     }
   }
   sensor.lastEvt=now;sensor.on=true;
@@ -1459,14 +1487,22 @@ function hush(){try{speechSynthesis.cancel();}catch(e){}}
 // A sweep takes a minute or two of him not touching the phone. iOS will dim
 // and lock the screen on its own, and a locked screen stops DeviceMotion
 // dead — which would abandon the sweep silently, halfway through.
-let wakeLock=null;
+/* There used to be a SECOND keepAwake() further down that took no argument.
+   Being the later declaration it replaced this one everywhere, so every
+   keepAwake(false) GRABBED a lock instead of releasing it and added another
+   visibilitychange listener. One definition now. iOS also drops the lock by
+   itself whenever the page is hidden, leaving a released sentinel behind --
+   hence the .released check rather than a plain null test. */
+let wakeLock=null, wakeManual=false;
 async function keepAwake(on){
   try{
-    if(on){if(!wakeLock&&navigator.wakeLock)wakeLock=await navigator.wakeLock.request("screen");}
-    else if(wakeLock){const w=wakeLock;wakeLock=null;await w.release();}
+    if(on){if((!wakeLock||wakeLock.released)&&navigator.wakeLock)wakeLock=await navigator.wakeLock.request("screen");}
+    else if(wakeLock&&!wakeManual){const w=wakeLock;wakeLock=null;await w.release();}
   }catch(e){wakeLock=null;}
 }
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&cas.run)keepAwake(true);});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"&&(cas.run||hand.run||toe.run||wakeManual))keepAwake(true);
+});
 
 /* ---------- permission / diagnostics ---------- */
 async function enableSensors(){
@@ -1664,12 +1700,19 @@ async function zeroAgainstLevel(kind){
   if(!ok){st.textContent="Too much movement — brace it against the level and try again.";toast("Hold still and try again");return;}
   const s=await sample(1200);
   if(kind==="roll"){
-    S.rollZero=rollError(s.g);store.set("rollZero",S.rollZero);
+    // One tap on the wrong one of two adjacent buttons used to store a 90
+    // degree "zero" that then broke the indicator for good.
+    if(!(casMount(s.g)==="portrait"&&s.g[1]<0)){st.innerHTML="<b>Not stored</b> — hold the phone <b>upright</b> (portrait, top UP) against the level for the plumb zero.";toast("Not upright — nothing stored");return;}
+    const z=rollError(s.g);
+    if(Math.abs(z)>5){st.innerHTML="<b>Not stored</b> — that reads "+Math.abs(z).toFixed(1)+"° off plumb, far more than any phone’s own error. Check the level is really plumb.";toast("Implausible — nothing stored");return;}
+    S.rollZero=z;store.set("rollZero",S.rollZero);
     st.innerHTML="<b>Plumb zeroed ✓</b> was reading "+fmt(S.rollZero)+"° at true vertical — now corrected.";
   }else{
     // Per axis. A single magnitude cannot be subtracted from a signed 2-axis
     // reading -- it would push one side's error the wrong way.
+    if(!(s.g[2]<-0.95)){st.innerHTML="<b>Not stored</b> — lay the phone <b>flat, screen UP</b> on the level surface for the level zero.";toast("Not flat — nothing stored");return;}
     const a=[D(Math.asin(clamp(s.g[0],-1,1))),D(Math.asin(clamp(s.g[1],-1,1)))];
+    if(Math.hypot(a[0],a[1])>5){st.innerHTML="<b>Not stored</b> — that reads "+Math.hypot(a[0],a[1]).toFixed(1)+"° off flat, far more than any phone’s own error. Check the surface is really level.";toast("Implausible — nothing stored");return;}
     S.levelZero2=a;store.set("levelZero2",a);
     S.levelZero=Math.hypot(a[0],a[1]);store.set("levelZero",S.levelZero);
     st.innerHTML="<b>Level zeroed ✓</b> was reading "+fmt(a[1],1)+"° top–bottom, "+fmt(a[0],1)+"° side–side at true flat — now corrected.";
@@ -1757,20 +1800,23 @@ function zeroUI(){for(let i=1;i<=3;i++){const el=$("zstep"+i);el.classList.toggl
    points at the PASSENGER side for every forward capture, so a positive
    result still means passenger side low, which is what camberCorrection()
    expects (+slope on left wheels, −slope on right).                       */
-let floorBusy=false, floorStop=false;
+let floorBusy=false, floorStop=false, floorAxis="front";
 function floorStepsUI(active=0){
-  const L=barIn(), T=Math.max(20,trackIn());
+  const L=barIn(), T=Math.max(20,trackIn()), pitch=floorAxis==="pitch";
   const steps=[
-    "<b>Equal-thickness blocks taped under each end</b> of the edge — middle clear of the floor.",
-    "<b>Across the truck between the tire contact patches</b>, blocks down, centred · <b>top of phone to the PASSENGER side</b>. Hold still.",
-    "<b>Turn it end for end</b> — blocks back in the same two spots · <b>top of phone to the DRIVER side</b>. Hold still."
+    "<b>Equal-thickness blocks taped under each end</b> of the edge \u2014 middle clear of the floor.",
+    pitch?"<b>ALONG the truck, beside the tires on one side</b>, blocks down, centred between the front and rear contact patches \u00b7 <b>top of phone toward the FRONT</b>. Hold still."
+         :"<b>Across the truck between the tire contact patches</b>, blocks down, centred \u00b7 <b>top of phone to the PASSENGER side</b>. Hold still.",
+    pitch?"<b>Turn it end for end</b> \u2014 blocks back in the same two spots \u00b7 <b>top of phone toward the REAR</b>. Hold still."
+         :"<b>Turn it end for end</b> \u2014 blocks back in the same two spots \u00b7 <b>top of phone to the DRIVER side</b>. Hold still."
   ];
   let h="";
   for(let i=1;i<=steps.length;i++)
     h+='<div class="step'+(i===active?" now":"")+'" id="fstep'+i+'"><div class="stepn">'+i+'</div><div class="stept">'+steps[i-1]+'</div></div>';
-  h+='<p class="small" style="margin-top:6px">Reading the slope over '+L+'″ and applying it across a '+T+'″ track'+
-     (L<T?" — centre the edge between the tires so the bit you skip is split evenly at both ends.":".")+'</p>';
-  h+='<details style="margin-top:8px"><summary>Why blocks, and why turn it round</summary><div class="dbody">'+"The blocks must be <b>attached to the edge</b>, not loose on the floor — two washers, two nuts, two scraps of the same plywood, anything consistent. Turning the edge end for end and averaging the pair is what cancels the phone’s own zero error, which is otherwise indistinguishable from real floor slope."+'</div></details>';
+  h+=pitch?'<p class="small" style="margin-top:6px">Fore-aft slope over '+L+'\u2033. It goes straight into <b>caster</b>, one for one: a floor falling 0.5\u00b0 toward the front reads caster 0.5\u00b0 low.</p>'
+          :'<p class="small" style="margin-top:6px">Reading the slope over '+L+'\u2033 and applying it across a '+T+'\u2033 track'+
+           (L<T?" \u2014 centre the edge between the tires so the bit you skip is split evenly at both ends.":".")+'</p>';
+  h+='<details style="margin-top:8px"><summary>Why blocks, and why turn it round</summary><div class="dbody">'+"The blocks must be <b>attached to the edge</b>, not loose on the floor \u2014 two washers, two nuts, two scraps of the same plywood, anything consistent. Turning the edge end for end and averaging the pair is what cancels the phone\u2019s own zero error, which is otherwise indistinguishable from real floor slope."+'</div></details>';
   $("floorSteps").innerHTML=h;
 }
 function waitSteadyOrStop(preMs){
@@ -1782,15 +1828,17 @@ function waitSteadyOrStop(preMs){
 async function floorRun(axle){
   if(!sensor.on){toast("Enable sensors first");return;}
   if(floorBusy)return; floorBusy=true; floorStop=false;
-  const LBL=axle==="front"?"FRONT":"REAR";
+  floorAxis=axle;
+  const pitch=axle==="pitch";
+  const LBL=axle==="front"?"FRONT axle":axle==="rear"?"REAR axle":"FORE-AFT";
   try{
     floorStepsUI(2);
-    $("floorState").textContent=LBL+" axle · straight edge on its blocks between the tires, top of phone toward the PASSENGER side — hold still…";
+    $("floorState").textContent=LBL+(pitch?" · straight edge on its blocks ALONG the truck beside the tires, top of phone toward the FRONT — hold still…":" · straight edge on its blocks between the tires, top of phone toward the PASSENGER side — hold still…");
     await waitSteadyOrStop(800);
     const a=await sample(1400);flash();beep(1200,0.1);
     $("fstep2").classList.remove("now");$("fstep2").classList.add("done");
     floorStepsUI(3);$("fstep1").classList.add("done");$("fstep2").classList.add("done");
-    $("floorState").textContent=LBL+" axle · now turn it end for end into the same two spots — hold still…";
+    $("floorState").textContent=LBL+" · now turn it end for end into the same two spots — hold still…";
     await new Promise(r=>setTimeout(r,2500));
     await waitSteadyOrStop(800);
     const b=await sample(1400);flash();beep(1320,0.12);
@@ -1801,14 +1849,16 @@ async function floorRun(axle){
     store.set("floors",S.floors);
     floorStateUI();setChip("chipFloor",true);
     camUI();renderResults();
-    toast((axle==="front"?"Front":"Rear")+" floor "+fmt(f.slope)+"° over "+barIn()+"″");
+    if(pitch){casUI();casRunsUI();}
+    toast(pitch?("Fore-aft floor "+fmt(f.slope)+"° ("+(f.slope>0?"front":f.slope<0?"rear":"neither")+" low) — applied to caster")
+               :((axle==="front"?"Front":"Rear")+" floor "+fmt(f.slope)+"° over "+barIn()+"″"));
   }catch(e){
     $("floorState").textContent="Stopped — nothing stored. Start it again when you’re ready.";
-  }finally{floorBusy=false;floorStop=false;floorStepsUI(0);}
+  }finally{floorBusy=false;floorStop=false;floorStepsUI(0);floorAxis="front";}
 }
 function floorZeroOut(){
   if(floorBusy)return;
-  S.floors[S.veh]={front:{slope:0,when:Date.now()},rear:{slope:0,when:Date.now()}};
+  S.floors[S.veh]={front:{slope:0,when:Date.now()},rear:{slope:0,when:Date.now()},pitch:{slope:0,when:Date.now()}};
   store.set("floors",S.floors);floorStateUI();setChip("chipFloor",true);camUI();renderResults();
 }
 function floorStateUI(){
@@ -1821,7 +1871,9 @@ function floorStateUI(){
     else if(m.slopes)t+=' <span class="small">· older walked measurement, '+m.slopes.length+" placements</span>";
     return t;
   };
-  $("floorState").innerHTML="Front axle: "+bit("front")+"<br>Rear axle: "+bit("rear");
+  const pm=f.pitch;
+  $("floorState").innerHTML="Front axle: "+bit("front")+"<br>Rear axle: "+bit("rear")+
+    "<br>Fore-aft (caster): "+(pm?"<b>"+fmt(pm.slope)+"° ("+(pm.slope>0?"front":pm.slope<0?"rear":"neither")+" low)</b>":"<b>not measured</b> — it goes into caster one for one");
   const sh=[];
   for(const a of["front","rear"]){
     const m=f[a];
@@ -1973,7 +2025,7 @@ async function casterStart(wheel){
 function casterAbort(){cas.run=false;sensor.yawRun=false;cas.phase=0;cas.pts=[];cas.acc0=null;casUI();hush();keepAwake(false);$("casMode").textContent="Caster sweep";}
 // The Stop button finishes a continuous run instead of throwing it away.
 function casStopBtn(){
-  if(hand.run){handAbort();toast("Hand-held sequence stopped");return;}
+  if(hand.run){if(handAbort())toast("Hand-held sequence stopped");return;}
   if(cas.run&&cas.test){cas.test=false;casterAbort();toast("Sensor check stopped");return;}
   if(cas.run&&casCont()&&cas.pts.length>=4){finishCasterFit();return;}
   if(cas.run&&casCont()&&cas.pts.length>1){toast("Only "+(cas.pts.length-1)+" capture(s) — need 3 to solve, 4 to check itself");say("Not enough captures yet. Keep going.");return;}
@@ -2066,6 +2118,15 @@ function casGuide(psi,dir,far,held){
    the wheel instead of replacing it, and the tile reports the mean, the
    spread between sweeps (1σ) and the standard error of that mean (σ/√n).
    Sweeping again without re-seating the phone measures nothing new. */
+/* Fore-aft floor slope goes straight into caster, ONE FOR ONE. A floor
+   falling toward the front tips both steering axes forward by that much, so
+   caster read against gravity comes out low by exactly the pitch (checked
+   with a full steering-axis rotation: 0.6 deg nose-down reads 3.0 as 2.4).
+   The camber flip-method floor step only measured side-to-side roll, which
+   ends up in c0 and SAI, never in caster. Stored runs keep the raw fit; the
+   correction is applied at display, like camber's floor correction. */
+function casPitch(){const f=S.floors&&S.floors[S.veh];return(f&&f.pitch&&isFinite(f.pitch.slope))?f.pitch.slope:0;}
+function casAdj(v){return v==null?null:v+casPitch();}
 function casStat(sweeps){
   const n=sweeps.length;
   const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
@@ -2188,8 +2249,8 @@ function finishCasterFit(){
     toast("Dropped capture "+which+" — short of the stop. Answer uses the other "+(r.n-1)+".");
     say("Note. I dropped "+dropped.size+" capture"+(dropped.size>1?"s":"")+" that "+(dropped.size>1?"were":"was")+" short of the stop. The answer uses the other "+(r.n-1)+". Hold hard against the lock every time and you will not lose any.");
   }
-  toast(`${cas.wheel} caster ${fmt(r.caster)}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
-  say("Caster "+r.caster.toFixed(1)+" degrees, from "+(r.n-1)+" captures"+
+  toast(`${cas.wheel} caster ${fmt(casAdj(r.caster))}° · ${r.n-1} captures · misfit ±${r.rms.toFixed(2)}°`+(bad?" — captures disagree, something is off":""));
+  say("Caster "+casAdj(r.caster).toFixed(1)+" degrees, from "+(r.n-1)+" captures"+
       (r.se!=null?", give or take "+r.se.toFixed(2):"")+". "+
       (bad?"But the captures disagree with each other by "+r.rms.toFixed(2)+" degrees, so do not trust that number. Check the bar is still taped tight and run it again."
           :"The captures agree well."));
@@ -2204,8 +2265,8 @@ function finishCaster(){
   $("casMode").textContent="Caster sweep";
   casUI();renderResults();
   const m=S.sess.cas[cas.wheel];
-  toast(`${cas.wheel} caster ${fmt(m.caster)}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat the phone and sweep again"));
-  say("Caster "+m.caster.toFixed(1)+" degrees"+(m.sd!=null?", spread "+m.sd.toFixed(2):"")+". "+(m.n<3?"Re-seat the phone and sweep again.":""));
+  toast(`${cas.wheel} caster ${fmt(casAdj(m.caster))}° · n=${m.n}`+(m.sd!=null?` spread ±${m.sd.toFixed(2)}°`:" — re-seat the phone and sweep again"));
+  say("Caster "+casAdj(m.caster).toFixed(1)+" degrees"+(m.sd!=null?", spread "+m.sd.toFixed(2):"")+". "+(m.n<3?"Re-seat the phone and sweep again.":""));
 }
 /* Steer-sensor self-test. Only James has an iPhone, so rather than assert
    from here how webkitCompassHeading behaves with the phone stuck to a
@@ -2300,46 +2361,42 @@ function casCalUI(){
 }
 /* ---------- hand-held three-position sweep ----------------------------------
 
-   WHY THIS EXISTS, AND WHY IT SHOULD WORK WHERE THE TAPED SWEEP DID NOT.
+   At each of STRAIGHT, LEFT, RIGHT:
+     leg 0  bar laid FLAT across the wheel, screen up, top to the bumper -> heading
+     leg 1  bar stood UP on the wheel face, screen out                   -> camber
+   The steer angle is the heading DIFFERENCE between positions; camber comes
+   off gravity. Nothing is taped to the wheel.
 
-   Taping the phone flat to the wheel face puts the device Z axis -- the screen
-   normal -- HORIZONTAL and pointing straight through the cast-iron brake
-   rotor. A compass heading is computed from the two HORIZONTAL field
-   components, so in that mount the one magnetometer axis aimed at the biggest
-   lump of iron on the truck feeds the answer one-for-one. That is the whole
-   reason the taped sweep wandered 3 to 6 degrees.
+   CORRECTION (audit, 2026-09-23). An earlier version of this comment said
+   laying the phone flat keeps the brake rotor's iron out of the heading,
+   because the rotor-facing axis becomes vertical. That was wrong. iOS gives
+   a TILT-COMPENSATED heading: the direction of the horizontal part of the
+   total field AT the phone, whichever way the phone is held, so orientation
+   excludes nothing. The hub, rotor and knuckle steer WITH the wheel, so their
+   pull on the compass turns with it and does not cancel in the difference.
+   What helps is distance (a dipole falls as 1/r^3) and an independent angle:
+   handFinish refits every run with the tape-measured lock angles when they
+   are stored, and says so when the two disagree.
 
-   Lay the phone FLAT instead, screen up, and Z becomes VERTICAL. The heading
-   is then built from X and Y only, and the rotor-facing axis is excluded from
-   it entirely. A residual tilt of alpha leaks only sin(alpha) of the Z offset
-   back in -- 3.5% at 2 degrees -- which is why the level gate below is not
-   decoration. Flat is also the orientation CoreLocation is designed around,
-   so tilt compensation is working in its best case rather than its worst.
+   Level: a tilt-compensated heading of the bar's long axis moves only at
+   second order with small tilts, so the level target is a consistency aid,
+   not an iron shield.
 
-   Holding it at the rim edge rather than taping it mid-face also puts the
-   phone several inches further from the rotor, and 1/r^3 is steep.
+   Heading-error cost, with SAI S (8-10 deg on this truck):
+     - an error in the STRAIGHT heading shifts both steer angles together,
+       which rotates (caster, SAI) and costs S per radian -- about 0.15-0.18
+       deg of caster per degree, at ANY steer angle. Same as a centring error.
+     - an error in the LEFT or RIGHT heading alone costs less the further you
+       steer: roughly 0.05-0.12 deg per degree at the locks.
+   So steering further helps the second, not the first.
 
-   So the sequence is, at each of three steering positions:
-     leg 0  phone FLAT on the rim, screen up, top toward the bumper  -> heading
-     leg 1  phone against the wheel FACE, screen out, top toward the bumper
-                                                                     -> camber
-   The steer angle is the heading DIFFERENCE between positions. Camber comes
-   off gravity exactly as it always has.
-
-   Two rules that matter more than they look:
-     - never turn the phone end-for-end between captures. Heading differences
-       are taken on the raw 0-360 reading by shortest path, so a 180 degree
-       flip would read as a 180 degree steer and is rejected rather than
-       silently halved.
-     - turn as far as the wheel will go. dCaster/dHeading = caster*cot(theta),
-       so the penalty for a sloppy heading SHRINKS with angle. */
+   Never turn the bar end-for-end on the heading leg: shortest-path heading
+   differences would read a 180 degree flip as a 180 degree steer. It is
+   refused at the capture. */
 const HAND_LEVEL_TOL=2.0;         // degrees off level allowed on a heading capture
-/* FURTHER IS BETTER, and the old 30-degree advice had it backwards.
-   dCaster/dHeading = caster * cot(theta), so the penalty for a sloppy heading
-   SHRINKS as the steer angle grows: 0.26 deg of caster per degree at 15,
-   0.19 at 20, 0.12 at 30, 0.08 at 45. Turn as far as the wheel will go.
-   The cap that remains exists only to catch the phone being turned
-   end-for-end, which reads as 180. */
+/* Steer to the locks: the LEFT/RIGHT heading errors cost less the further
+   you go (the STRAIGHT one does not -- see above). HAND_MAX exists only to
+   catch the bar turned end-for-end, which reads as 180. */
 const HAND_MIN=12,HAND_MAX=75;
 const HAND_POS=["STRAIGHT AHEAD","LEFT","RIGHT"];
 const hand={run:false,wheel:null,pos:0,leg:0,data:null,busy:false};
@@ -2395,7 +2452,9 @@ function handUI(){
   if(run)run.style.display=hand.run?"":"none";
   if(!hand.run){
     st.innerHTML=handActive()
-      ? "Pick a wheel. <b>Six captures</b>: heading + camber at straight, left and right. Turn the wheel <b>as far as it will go</b> — further is better."
+      ? "Pick a wheel. <b>Six captures</b>: heading + camber at straight, left and right. Wheels dead straight first; at LEFT and RIGHT go hard onto the lock."+
+        (casPitch()||(S.floors[S.veh]&&S.floors[S.veh].pitch)?"":" <b>Fore-aft floor slope not measured</b> — it adds straight into caster (Setup → 4).")+
+        (casStops()?"":" No tape lock angles stored, so the compass has nothing to be checked against.")
       : "Hand-held sequence is not the selected mode — pick it in the list below.";
     return;
   }
@@ -2412,19 +2471,54 @@ function handUI(){
   const done=hand.pos*2+hand.leg;
   $("handProgress").textContent=rows.join(NLCH)+NLCH+done+" of 6 captured";
 }
+function handRefuse(msg,spoken){beep(300,0.2,0.2);toast(msg);say(spoken||msg);}
+/* The compass heading as it stood over the WHOLE sample window rather than
+   one instantaneous value read at the end of it: the mean (unwrapped about
+   the first reading, so 359 and 1 average to 0, not 180), how far it moved,
+   the worst accuracy iOS reported, and whether any fresh events arrived at
+   all (a stalled stream would otherwise hand back a stale heading). */
+function headingOver(ms){
+  return new Promise(res=>{
+    const h0=sensor.compassHeading,e0=sensor.compassEvt;
+    if(h0==null){res(null);return;}
+    let n=0,sum=0,lo=0,hi=0,acc=null;
+    const take=()=>{const h=sensor.compassHeading;if(h==null)return;
+      const dl=headingStepDelta(h0,h);sum+=dl;n++;if(dl<lo)lo=dl;if(dl>hi)hi=dl;
+      const a=sensor.compassAccuracy;if(a!=null)acc=(acc==null||a<0||(acc>=0&&a>acc))?a:acc;};
+    take();
+    const iv=setInterval(take,1000/30);
+    setTimeout(()=>{clearInterval(iv);take();
+      res({hdg:((h0+sum/n)%360+360)%360,spread:hi-lo,acc:acc,fresh:sensor.compassEvt-e0});},ms);
+  });
+}
 function handCapture(){
   if(!hand.run||hand.busy)return;
   hand.busy=true;
-  handGrab().finally(()=>{hand.busy=false;handUI();});
+  // Acknowledge the tap at once. The flash and beep used to come only after
+  // the 0.9 s sample, which invited a second tap -- and that second tap was
+  // taken as the NEXT leg with the bar still in the wrong attitude.
+  const b=$("btnHandCap");
+  if(b){b.disabled=true;b.textContent="Hold still\u2026";}
+  beep(760,0.04,0.15);
+  handGrab().catch(()=>toast("Capture failed \u2014 try again")).finally(()=>{
+    hand.busy=false;
+    if(b){b.disabled=false;b.textContent="Capture";}
+    handUI();
+  });
 }
 function handUndo(){
   if(!hand.run){toast("Not running");return;}
+  if(hand.busy){toast("Wait \u2014 still capturing");return;}
   if(hand.leg===1){
-    const d=hand.data[hand.pos];delete d.hdg;delete d.lvl;delete d.acc;
-    hand.leg=0;toast("Heading capture undone");
+    const d=hand.data[hand.pos];delete d.hdg;delete d.lvl;delete d.acc;delete d.hspread;
+    hand.leg=0;toast(HAND_POS[hand.pos]+" heading undone \u2014 capture it again");
   }else if(hand.pos>0){
     hand.pos--;hand.leg=1;delete hand.data[hand.pos].camb;
-    toast("Camber capture undone");
+    // The camber being redone belongs to the PREVIOUS position. If he has
+    // already walked to the cab and steered, capturing it where the wheel
+    // now sits would pair it with the wrong angle.
+    toast("Camber for "+HAND_POS[hand.pos]+" undone \u2014 the wheel must be back at "+HAND_POS[hand.pos]+" (steer back if you moved it)");
+    say("Camber undone. Make sure the wheel is back at "+HAND_POS[hand.pos].toLowerCase()+", then capture camber.");
   }else{toast("Nothing to undo yet");return;}
   handUI();casUI();
 }
@@ -2446,28 +2540,67 @@ function handStart(wheel){
   toast("Straight ahead \u2014 phone FLAT on the rim, screen up");
 }
 function handAbort(){
+  if(hand.busy){toast("Wait \u2014 still capturing");return false;}
   hand.run=false;hand.busy=false;hand.data=null;
   keepAwake(false);hush();
   $("casMode").textContent="Caster sweep";
   casUI();handUI();
+  return true;
 }
 async function handGrab(){
+  // Which slot this capture is FOR is fixed at the tap: an Undo, Stop or
+  // Start in the meantime must not redirect a pending sample elsewhere.
+  const run=hand.data,pos=hand.pos,leg=hand.leg,P=HAND_POS[pos];
+  const stale=()=>!hand.run||hand.data!==run||hand.pos!==pos||hand.leg!==leg;
+  // Let the tap jolt die away, then insist on stillness, as camCapture does.
+  await new Promise(r=>setTimeout(r,250));
+  if(!isSteady(400)){
+    const ok=await Promise.race([waitSteady(400).then(()=>true),new Promise(r=>setTimeout(()=>r(false),4000))]);
+    if(stale())return;
+    if(!ok){handRefuse("Not captured \u2014 too shaky. Brace the bar on the wheel, hold still, Capture again","Not captured. Too shaky.");return;}
+  }
+  const hp=leg===0?headingOver(900):null;
   const s=await sample(900);
-  const d=hand.data[hand.pos];
-  if(hand.leg===0){
-    d.hdg=sensor.compassHeading;
+  const hd=hp?await hp:null;
+  if(stale())return;
+  const d=run[pos];
+  if(leg===0){
+    /* ATTITUDE. With manual capture nothing else stops a tap made with the
+       bar in the wrong pose -- a heading taken upright is ~90 deg out. */
+    if(!(s.g[2]<-0.85)){handRefuse("Not captured \u2014 the bar isn\u2019t flat. Lay it ACROSS the wheel, screen UP, then Capture","Not captured. Lay the bar flat across the wheel, screen up.");return;}
+    /* COMPASS HEALTH. iOS reports accuracy -1 when its own heading is
+       invalid (and sends heading 0 with it); a heading that moves while the
+       bar is held still is a compass still settling after being near steel;
+       no fresh events means the stream stalled and the value is stale. */
+    if(!hd||!hd.fresh){handRefuse("Not captured \u2014 no fresh compass reading. Wait a moment and Capture again","Not captured. The compass is not updating.");return;}
+    if(hd.acc!=null&&hd.acc<0){handRefuse("Not captured \u2014 iOS says its compass heading is invalid here. Wave the phone in a figure-8 away from the truck, come back, Capture again","Not captured. The compass says its heading is invalid.");return;}
+    if(hd.spread>2){handRefuse("Not captured \u2014 the compass moved "+hd.spread.toFixed(1)+"\u00b0 while you held still. Hold it a few seconds and Capture again","Not captured. The compass is still settling.");return;}
+    /* STEER ANGLE, checked NOW rather than after all six captures, so a bad
+       one costs one capture instead of the whole run and two walks. */
+    if(pos>0){
+      const th=handTheta(run[0].hdg,hd.hdg),want=pos===1?1:-1;
+      let why=null;
+      if(Math.abs(th)>HAND_MAX)why="it reads "+Math.abs(th).toFixed(0)+"\u00b0 of steer. Is the bar end-for-end? Top of the phone toward the BUMPER";
+      else if(Math.abs(th)<HAND_MIN)why="only "+Math.abs(th).toFixed(1)+"\u00b0 of steer. Turn the wheel further "+P;
+      else if(Math.sign(th)!==want)why="that is steered "+(th>0?"LEFT":"RIGHT")+", and this step is "+P;
+      if(why){handRefuse("Not captured \u2014 "+why,"Not captured. "+why);return;}
+    }
+    d.hdg=hd.hdg;d.hspread=hd.spread;d.acc=hd.acc;
     d.lvl=handLevelErr(s.g);
-    d.acc=sensor.compassAccuracy;
     hand.leg=1;
     flash();beep(1180,0.09);
-    const th=hand.pos===0?0:handTheta(hand.data[0].hdg,d.hdg);
-    if(d.lvl>HAND_LEVEL_TOL)
-      toast("Caught, but "+fmt(d.lvl,1)+"\u00b0 off level \u2014 that leaks rotor iron into the heading");
-    else
-      toast(HAND_POS[hand.pos]+" heading"+(hand.pos?" \u00b7 "+fmt(th,1)+"\u00b0 of steer":"")+" \u2014 now CAMBER");
-    say("Heading caught"+(hand.pos?", "+Math.round(Math.abs(th))+" degrees":"")+". Now camber.");
+    const th=pos===0?0:handTheta(run[0].hdg,d.hdg);
+    toast(P+" heading"+(pos?" \u00b7 "+fmt(th,1)+"\u00b0 of steer":"")+
+      (d.lvl>HAND_LEVEL_TOL?" \u00b7 \u26a0 "+d.lvl.toFixed(1)+"\u00b0 off level":"")+
+      (d.acc!=null&&d.acc>25?" \u00b7 \u26a0 compass \u00b1"+Math.round(d.acc)+"\u00b0":"")+" \u2014 now CAMBER");
+    say("Heading caught"+(pos?", "+Math.round(Math.abs(th))+" degrees":"")+". Now camber.");
   }else{
-    d.camb=(S.camSign[hand.wheel]||1)*tiltZ(s.g);
+    if(!handFaceOk(s.g)){handRefuse("Not captured \u2014 the bar is still flat. Stand it UP on the wheel face, screen OUT, then Capture","Not captured. Stand the bar up on the wheel face.");return;}
+    const c=(S.camSign[hand.wheel]||1)*tiltZ(s.g);
+    // No road wheel sits at 15 degrees of camber: this is the bar leaning on
+    // the tyre or held off the face, not a reading.
+    if(Math.abs(c)>15){handRefuse("Not captured \u2014 that reads "+fmt(c,1)+"\u00b0, which is not a wheel. Seat both feet on the rim and Capture again","Not captured. Seat the bar on the rim.");return;}
+    d.camb=c;
     hand.leg=0;hand.pos++;
     flash();beep(1320,0.09);
     if(hand.pos>2){handFinish();return;}
@@ -2482,13 +2615,12 @@ function handFinish(){
   $("casMode").textContent="Caster sweep";
   const d=hand.data;
   const thL=handTheta(d[0].hdg,d[1].hdg), thR=handTheta(d[0].hdg,d[2].hdg);
+  // Backstop only -- each heading is checked as it is captured now.
   const bad=[];
   if(thL==null||thR==null)bad.push("a heading went missing");
   else{
-    if(Math.abs(thL)<HAND_MIN)bad.push("the LEFT steer was only "+fmt(Math.abs(thL),0)+"\u00b0");
-    if(Math.abs(thR)<HAND_MIN)bad.push("the RIGHT steer was only "+fmt(Math.abs(thR),0)+"\u00b0");
-    if(Math.abs(thL)>HAND_MAX||Math.abs(thR)>HAND_MAX)
-      bad.push("a steer angle over "+HAND_MAX+"\u00b0 \u2014 did the phone get turned end-for-end?");
+    if(Math.abs(thL)<HAND_MIN||Math.abs(thR)<HAND_MIN)bad.push("a steer under "+HAND_MIN+"\u00b0");
+    if(Math.abs(thL)>HAND_MAX||Math.abs(thR)>HAND_MAX)bad.push("a steer over "+HAND_MAX+"\u00b0");
     if(thL<0||thR>0)bad.push("left and right came out the same way round");
   }
   if(bad.length){
@@ -2496,24 +2628,41 @@ function handFinish(){
     say("I could not use that run. "+bad[0]+". Try it again.");
     hand.data=null;casUI();return;
   }
-  const pts=[{th:0,camb:d[0].camb,src:"hand"},
-             {th:thL,camb:d[1].camb,src:"hand",hdg:d[1].hdg,lvl:d[1].lvl},
-             {th:thR,camb:d[2].camb,src:"hand",hdg:d[2].hdg,lvl:d[2].lvl}];
+  const pts=[{th:0,camb:d[0].camb,src:"hand",hdg:d[0].hdg,acc:d[0].acc},
+             {th:thL,camb:d[1].camb,src:"hand",hdg:d[1].hdg,lvl:d[1].lvl,acc:d[1].acc},
+             {th:thR,camb:d[2].camb,src:"hand",hdg:d[2].hdg,lvl:d[2].lvl,acc:d[2].acc}];
   const r=casFit(hand.wheel,pts);
   if(!r){toast("Couldn't solve that \u2014 the two steers were too alike");say("Could not solve that. The two steers were too alike.");hand.data=null;casUI();return;}
+  /* CROSS-CHECK AGAINST THE TAPE. The hub, rotor and knuckle steer WITH the
+     wheel, so whatever pull they have on the compass turns with it and does
+     not cancel in the heading difference. When tape-measured lock angles are
+     stored, the SAME three camber readings are refitted with those angles --
+     no magnetometer anywhere in that path. Hard on the locks, the two must
+     agree; when they don't, the compass is the suspect, and the size of the
+     disagreement says by how much. */
+  let tape=null;
+  const st=casStops();
+  if(st){
+    const rt=casFit(hand.wheel,[{th:0,camb:d[0].camb},{th:st.L.deg,camb:d[1].camb},{th:-st.R.deg,camb:d[2].camb}]);
+    if(rt)tape={thL:st.L.deg,thR:-st.R.deg,caster:rt.caster,sai:rt.sai,dL:thL-st.L.deg,dR:thR+st.R.deg};
+  }
   const prev=S.sess.cas[hand.wheel];
   const entry={caster:r.caster,sai:r.sai,thL:r.thL,thR:r.thR,c0:r.c0,
-               nCap:r.n,rms:r.rms,fitSe:r.se,src:"hand",pts:pts,
+               nCap:r.n,rms:r.rms,fitSe:r.se,src:"hand",pts:pts,tape:tape,
                cal:false,stopBad:0,sensorRatio:null,
-               worstLevel:Math.max(d[0].lvl||0,d[1].lvl||0,d[2].lvl||0)};
+               worstLevel:Math.max(d[0].lvl||0,d[1].lvl||0,d[2].lvl||0),
+               worstAcc:[d[0].acc,d[1].acc,d[2].acc].reduce((m,a)=>a==null?m:(m==null||a>m?a:m),null)};
   const sweeps=((prev&&prev.sweeps)?prev.sweeps:[]).concat([entry]);
   S.sess.cas[hand.wheel]=casStat(sweeps);saveSess();
   hand.data=null;casUI();casRunsUI();renderResults();
-  const sp=spec();
-  toast("Caster "+fmt(r.caster)+"\u00b0 \u00b7 SAI "+fmt(r.sai)+"\u00b0 \u00b7 swing "+fmt(thL,0)+"/"+fmt(thR,0)+"\u00b0");
-  say("Caster "+fmt(r.caster,1)+" degrees on the "+(hand.wheel==="LF"?"left":"right")+" front. "+
-      "S A I "+fmt(r.sai,1)+". "+
-      (sp&&sp.cas!=null?(Math.abs(r.caster-sp.cas)<=(sp.casT||0.5)?"That is in spec.":"That is out of spec."):""));
+  const sp=spec(),cv=casAdj(r.caster);
+  const dis=tape?Math.max(Math.abs(tape.dL),Math.abs(tape.dR)):0;
+  toast("Caster "+fmt(cv)+"\u00b0"+(tape?" \u00b7 tape stops say "+fmt(casAdj(tape.caster))+"\u00b0":"")+
+        " \u00b7 swing "+fmt(thL,0)+"/"+fmt(thR,0)+"\u00b0"+
+        (tape&&dis>2?" \u00b7 \u26a0 compass and tape angles differ by "+dis.toFixed(1)+"\u00b0":""));
+  say("Caster "+fmt(cv,1)+" degrees on the "+(hand.wheel==="LF"?"left":"right")+" front. "+
+      (tape?(dis>2?"The compass and the tape disagree by "+dis.toFixed(1)+" degrees, so trust the tape number, "+fmt(casAdj(tape.caster),1)+", if you were hard on the locks. ":"The tape angles agree. "):"")+
+      (sp&&sp.cas!=null?(Math.abs(cv-sp.cas)<=(sp.casT||0.5)?"That is in spec.":"That is out of spec."):""));
 }
 /* Every run kept and shown, not just the average.
 
@@ -2533,6 +2682,15 @@ function handFinish(){
    Two taps to delete. The x arms on the first tap and fires on the second
    (disarming after 3 s), because a phone held against a wheel is exactly
    where a stray thumb lands. */
+/* Same arm-then-fire pattern as the per-row delete, for every button that
+   throws work away in one tap. The caster tile "clear", Stop and the
+   clear-alls sit right beside Capture/Undo, on a phone whose screen is held
+   awake while it is carried to and from the cab. */
+function armConfirm(btn,armText,act){
+  if(btn.classList.contains("arm")){clearTimeout(btn._t);btn.classList.remove("arm");btn.textContent=btn._orig;act();return;}
+  btn._orig=btn.textContent;btn.classList.add("arm");btn.textContent=armText;
+  clearTimeout(btn._t);btn._t=setTimeout(()=>{btn.classList.remove("arm");btn.textContent=btn._orig;},3000);
+}
 function runRow(kind,w,i,text){
   return '<div class="runrow"><span class="rtx">'+text+'</span>'+
          '<button class="btn ghost" data-rundel="'+kind+'|'+w+'|'+i+'" title="Delete this capture">\u2715</button></div>';
@@ -2545,21 +2703,28 @@ function casRunsUI(){
     if(!e||!e.sweeps||!e.sweeps.length)continue;
     h+='<div class="runw">'+w+'</div>';
     e.sweeps.forEach((sw,i)=>{
+      /* Three positions solve three unknowns exactly, so a hand-held run's
+         misfit is ALWAYS 0.00 -- showing it would be false reassurance. What
+         does vary run to run is how level the heading captures were, what
+         the compass said about itself, and -- when the locks are taped --
+         how far the compass angles sit from the tape. */
+      const exact=sw.nCap!=null&&sw.nCap<=3;
+      const tp=sw.tape,dis=tp?Math.max(Math.abs(tp.dL),Math.abs(tp.dR)):0;
       h+=runRow("cas",w,i,
-        "Capture "+(i+1)+" \u00b7 <b>"+fmt(sw.caster)+"\u00b0</b>"+
-        " \u00b7 SAI "+fmt(sw.sai)+"\u00b0"+
+        "Capture "+(i+1)+" \u00b7 <b>"+fmt(casAdj(sw.caster))+"\u00b0</b>"+
+        (tp?" \u00b7 tape "+fmt(casAdj(tp.caster))+"\u00b0"+(dis>2?" \u26a0":""):"")+
         " \u00b7 swing "+fmt(sw.thL,0)+"/"+fmt(sw.thR,0)+"\u00b0"+
-        /* Three positions solve three unknowns exactly, so a hand-held run's
-           misfit is ALWAYS 0.00 -- showing it would be false reassurance. What
-           does vary run to run is how level the heading captures were. */
-        (sw.nCap!=null&&sw.nCap<=3
-          ?(sw.worstLevel!=null?" \u00b7 level "+sw.worstLevel.toFixed(1)+"\u00b0"+(sw.worstLevel>HAND_LEVEL_TOL?" \u26a0":""):"")
+        " \u00b7 SAI "+fmt(sw.sai)+"\u00b0"+
+        (exact
+          ?(sw.worstLevel!=null?" \u00b7 level "+sw.worstLevel.toFixed(1)+"\u00b0"+(sw.worstLevel>HAND_LEVEL_TOL?" \u26a0":""):"")+
+           (sw.worstAcc!=null&&sw.worstAcc>25?" \u00b7 compass \u00b1"+Math.round(sw.worstAcc)+"\u00b0 \u26a0":"")
           :(sw.rms!=null?" \u00b7 misfit \u00b1"+sw.rms.toFixed(2)+"\u00b0":"")));
     });
     if(e.sweeps.length>1){
       const v=e.sweeps.map(x=>x.caster);
-      h+='<div class="runavg">average <b>'+fmt(e.caster)+'\u00b0</b> over '+v.length+
-         ' \u00b7 spread '+(Math.max.apply(null,v)-Math.min.apply(null,v)).toFixed(2)+'\u00b0</div>';
+      h+='<div class="runavg">average <b>'+fmt(casAdj(e.caster))+'\u00b0</b> over '+v.length+
+         ' \u00b7 spread '+(Math.max.apply(null,v)-Math.min.apply(null,v)).toFixed(2)+'\u00b0'+
+         (casPitch()?' \u00b7 incl. floor pitch '+fmt(casPitch())+'\u00b0':'')+'</div>';
     }
   }
   el.innerHTML=h||"Nothing captured yet.";
@@ -2621,7 +2786,7 @@ function casLogUI(){
   if(!pts){
     for(const w of["LF","RF"]){
       const m=S.sess.cas[w],last=m&&m.sweeps&&m.sweeps.length?m.sweeps[m.sweeps.length-1]:null;
-      if(last&&last.pts&&last.pts.length>1){pts=last.pts;head=w+" · misfit ±"+(last.rms!=null?last.rms.toFixed(3):"?")+"°";}
+      if(last&&last.pts&&last.pts.length>1){pts=last.pts;head=w+(last.nCap!=null&&last.nCap<=3?" · hand-held, 3 positions (exact fit: no misfit to report)":" · misfit ±"+(last.rms!=null?last.rms.toFixed(3):"?")+"°");}
     }
   }
   if(!pts){el.textContent="nothing captured yet";return;}
@@ -2635,7 +2800,7 @@ function casLogUI(){
   el.textContent=head+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
 }
 const CAS_MODE_NOTE={
-  hand:"<b>Hand-held · three positions.</b> Angle comes from the phone's COMPASS, read with the bar laid flat, which keeps the rotor-facing axis out of the heading. Nothing taped. Turn as far as the wheel will go — accuracy improves with angle.",
+  hand:"<b>Hand-held · three positions.</b> Steer angle comes from the phone's COMPASS (heading difference, bar laid flat across the wheel). Nothing taped. The hub and rotor steer with the wheel and can pull the compass, so if tape-measured lock angles are stored (below) every run is re-checked against them.",
   cal:"<b>Steering stops · tape-calibrated.</b> Angle comes from a TAPE MEASURE: measure both steering locks once (below) and every sweep uses those stored numbers. No angle sensor in the path at all.",
   cont:"<b>Keep sweeping · sensor angle.</b> Angle comes from the compass or gyro with the phone TAPED to the wheel face. That mount aims the phone's screen-normal axis straight through the brake rotor, which is what made readings wander 3° to 6° on this truck. Kept only for a phone that reads clean.",
   stops:"<b>One lock-to-lock pair · sensor angle.</b> Two captures, taped mount. Exactly as many equations as unknowns, so the misfit is always zero and can never warn you about anything.",
@@ -2648,8 +2813,8 @@ function casModeNoteUI(){
 function casStepsUI(){
   if(handActive()){
     const th=[
-      "<b>Mount the phone on the straight edge once and leave it there.</b> Wheels straight, then two captures at each of three steering positions — straight, left, right. Turn the wheel <b>as far as it will go</b> &mdash; further is better, not worse: the penalty for a sloppy heading shrinks as the angle grows.",
-      "<b>Heading:</b> bar laid <b>ACROSS the wheel, flat and level, screen UP, top toward the bumper</b> — resting on the rim front and rear so it lines up with the wheel. It will not capture until you are inside "+HAND_LEVEL_TOL+"° of level, and that gate is doing real work.",
+      "<b>Mount the phone on the straight edge once and leave it there.</b> Wheels <b>dead straight</b> first &mdash; every degree off straight costs about 0.15&deg; of caster, however far you then steer. Two captures at each of three positions: straight, left, right. At LEFT and RIGHT turn <b>hard onto the lock</b>.",
+      "<b>Heading:</b> bar laid <b>ACROSS the wheel, flat and level, screen UP, top toward the bumper</b> — resting on the rim front and rear so it lines up with the wheel. It refuses the heading unless the bar is flat, still, and the compass is steady; more than "+HAND_LEVEL_TOL+"° off level is taken but flagged ⚠.",
       "<b>Camber:</b> stand the same bar <b>UP AND DOWN against the wheel face</b> — phone <b>TOP UP, screen facing OUT</b>, away from the truck. Only the bar turns; the phone never moves on it. Then steer to the next position and repeat.<br><b>On the heading leg only:</b> the top must point at the bumper, never away — end-for-end reads as a 180° steer and the run is refused. On this camber leg the top just points at the sky and which way round it sits makes no difference."
     ];
     for(let i=1;i<=3;i++){const el=$("cstep"+i);if(el)el.querySelector(".stept").innerHTML=th[i-1];}
@@ -2691,7 +2856,7 @@ function casUI(){
   for(let i=1;i<=3;i++){const el=$("cstep"+i);el.classList.toggle("done",cas.phase>i);el.classList.toggle("now",cas.phase===i);}
   for(const w of["LF","RF"]){
     const m=S.sess.cas[w];
-    $("cas"+w+"v").textContent=m?fmt(m.caster,2)+"°":"–";
+    $("cas"+w+"v").textContent=m?fmt(casAdj(m.caster),2)+"°":"–";
     if(!m){$("cas"+w+"s").textContent="";continue;}
     const last=(m.sweeps&&m.sweeps.length)?m.sweeps[m.sweeps.length-1]:null;
     // A fitted run carries its own quality, so a single good run no longer
@@ -2709,6 +2874,8 @@ function casUI(){
       (fit?"<br>"+(fit.nCap-1)+" captures · misfit ±"+fit.rms.toFixed(2)+"°"+(fit.fitSe!=null?" · fit ±"+fit.fitSe.toFixed(2)+"°":"")+
            " · "+(fit.cal?"angle from tape":(fit.src||"?"))+(fit.stopBad?" · <b>"+fit.stopBad+" short of the stop</b>":""):"")+
       (exact?"<br>hand-held · level "+(last.worstLevel!=null?last.worstLevel.toFixed(1)+"°"+(last.worstLevel>HAND_LEVEL_TOL?" <b>⚠ over "+HAND_LEVEL_TOL+"°</b>":""):"–"):"")+
+      (last&&last.tape?"<br>tape stops: "+fmt(casAdj(last.tape.caster),2)+"°"+(Math.max(Math.abs(last.tape.dL),Math.abs(last.tape.dR))>2?" <b>⚠ compass off by "+Math.max(Math.abs(last.tape.dL),Math.abs(last.tape.dR)).toFixed(1)+"°</b>":" · compass agrees"):"")+
+      (casPitch()?"<br>floor pitch corr "+fmt(casPitch())+"°":"")+
       "<br>"+(last?"swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
   }
   const b=$("btnCasAbort");
@@ -2738,9 +2905,10 @@ function toeStart(){
   if(!sensor.on){toast("Enable sensors first");return;}
   if(!sensor.hasRot){toast("No gyro — use tape mode below");return;}
   if(S.gyroSign===0){toast("Do the flat check first (Setup step 2)");return;}
-  toe.run=true;toe.idx=0;toe.stations=[];
+  toe.run=true;toe.idx=0;toe.stations=[];sensor.yawGap=0;
+  keepAwake(true);   // a screen lock mid-carry stops the gyro stream outright
   $("btnToeCap").disabled=false;
-  $("toeState").innerHTML="Bar on <b>RF</b> (passenger front), horizontal, phone top toward the bumper. Hold still, tap <b>Capture</b>. Gyro tracking starts on this first capture — after it, carry smooth.";
+  $("toeState").innerHTML="Bar on <b>RF</b> (passenger front), <b>flat across the wheel, screen UP</b>, top toward the bumper. Hold still, tap <b>Capture</b>. Gyro tracking starts on this first capture — after it, carry smooth and <b>keep the screen on</b>.";
 }
 async function toeCapture(){
   if(!toe.run)return;
@@ -2751,12 +2919,20 @@ async function toeCapture(){
   }
   const seq=toeSeq();
   const s=await sample(1200);
-  if(toe.idx===0){sensor.gyroBias=s.rot;sensor.yaw=0;sensor.yawRun=true;}
+  if(toe.idx===0){sensor.gyroBias=s.rot;sensor.yaw=0;sensor.yawGap=0;sensor._wzPrev=null;sensor.yawRun=true;}
+  else if(sensor.yawGap>0.5){
+    const gp=sensor.yawGap;
+    sensor.yawRun=false;toe.run=false;toe.idx=0;toe.stations=[];$("btnToeCap").disabled=true;keepAwake(false);
+    beep(300,0.25,0.2);
+    $("toeState").innerHTML="<b>Pass abandoned.</b> The motion sensors stopped for "+gp.toFixed(1)+" s during the carry (screen locked, or the app was switched away), and the rotation in that gap can’t be recovered. Keep the screen on — Auto-Lock → Never — and start the pass again.";
+    toast("Pass abandoned — sensors paused "+gp.toFixed(1)+" s mid-carry");
+    return;
+  }
   toe.stations.push({id:seq[toe.idx],t:performance.now(),psi:sensor.yaw});
   flash();beep(1200,0.1);
   toe.idx++;
   if(toe.idx>=seq.length){
-    sensor.yawRun=false;toe.run=false;$("btnToeCap").disabled=true;
+    sensor.yawRun=false;toe.run=false;$("btnToeCap").disabled=true;keepAwake(false);
     const r=toeReduce(toe.stations);
     toe.passes.push({...r,mode:toe.mode,when:Date.now()});
     store.set("toePasses2",toe.passes);
@@ -2782,7 +2958,7 @@ async function toeCapture(){
     $("toeState").innerHTML="Tracking ✓ — carry "+where+(onRail?"":", seat it (top toward the bumper)")+", hold still, <b>Capture</b>.";
   }
 }
-function toeResetPasses(){toe.passes=[];store.set("toePasses2",[]);toe.run=false;toe.idx=0;sensor.yawRun=false;$("btnToeCap").disabled=true;$("toeState").textContent="Not running.";toeRender();}
+function toeResetPasses(){toe.passes=[];store.set("toePasses2",[]);toe.run=false;toe.idx=0;sensor.yawRun=false;keepAwake(false);$("btnToeCap").disabled=true;$("toeState").textContent="Not running.";toeRender();}
 function toeAgg(){
   const P=toe.passes;
   if(!P.length)return null;
@@ -2871,7 +3047,7 @@ function renderResults(){
   const camLF=camVal("LF"),camRF=camVal("RF");
   const vCamL=verdict(camLF,sp.cam,sp.camT),vCamR=verdict(camRF,sp.cam,sp.camT);
   html+=row("F camber",cell(camLF,c.LF),cell(camRF,c.RF),fmt(sp.cam)+" ±"+sp.camT,pill(vCamL)+" "+pill(vCamR));
-  const casLF=k.LF?k.LF.caster:null,casRF=k.RF?k.RF.caster:null;
+  const casLF=k.LF?casAdj(k.LF.caster):null,casRF=k.RF?casAdj(k.RF.caster):null;
   const vCasL=verdict(casLF,sp.cas,sp.casT),vCasR=verdict(casRF,sp.cas,sp.casT);
   html+=row("F caster",cell(casLF,k.LF),cell(casRF,k.RF),fmt(sp.cas)+" ±"+sp.casT,pill(vCasL)+" "+pill(vCasR));
   const xCam=(camLF!=null&&camRF!=null)?camLF-camRF:null;
@@ -2926,12 +3102,12 @@ function reportText(){
   L.push(prof().name);
   const fl=S.floors[S.veh]||{};
   const flBit=m=>m?fmt(m.slope)+"°"+(m.slopes&&m.slopes.length>1?" ("+m.slopes.length+" placements)":""):"n/a";
-  L.push("floor F "+flBit(fl.front)+" R "+flBit(fl.rear)+" · gauge zero "+(S.zero?fmt(S.zero.off)+"°":"n/a"));
+  L.push("floor F "+flBit(fl.front)+" R "+flBit(fl.rear)+" fore-aft "+flBit(fl.pitch)+" · gauge zero "+(S.zero?fmt(S.zero.off)+"°":"n/a"));
   L.push("");
   const camBit=w=>{const m=c[w];return m?fmt(camVal(w))+"° (n="+(m.n||1)+(m.se!=null?", ±"+m.se.toFixed(2):"")+")":"–";};
   L.push("F camber  LF "+camBit("LF")+"  RF "+camBit("RF")+"  (spec "+fmt(sp.cam)+" ±"+sp.camT+")");
   const nBit=m=>m?" (n="+(m.n||1)+(m.se!=null?", ±"+m.se.toFixed(2):"")+")":"";
-  L.push("F caster  LF "+(k.LF?fmt(k.LF.caster)+"°"+nBit(k.LF):"–")+"  RF "+(k.RF?fmt(k.RF.caster)+"°"+nBit(k.RF):"–")+"  (spec "+fmt(sp.cas)+" ±"+sp.casT+")");
+  L.push("F caster  LF "+(k.LF?fmt(casAdj(k.LF.caster))+"°"+nBit(k.LF):"–")+"  RF "+(k.RF?fmt(casAdj(k.RF.caster))+"°"+nBit(k.RF):"–")+"  (spec "+fmt(sp.cas)+" ±"+sp.casT+")");
   L.push("F toe     "+(S.sess.toeF!=null?fmt(S.sess.toeF)+"° total ("+toeInches(S.sess.toeF)+"\" · "+(S.sess.toeMethod||"")+")":"–")+"  (spec "+fmt(sp.toe)+" ±"+sp.toeT+")");
   if(S.sess.toeLF!=null)L.push("F toe vs thrust  LF "+fmt(S.sess.toeLF)+"°  RF "+fmt(S.sess.toeRF)+"°");
   L.push("R camber  LR "+camBit("LR")+"  RR "+camBit("RR")+"  (spec "+fmt(sp.rcam)+" ±"+sp.rcamT+")");
@@ -2951,6 +3127,7 @@ function archiveSession(){
   S.past.unshift({when:Date.now(),veh:S.veh,vehName:label,notes:notes,text:reportText()});
   S.past=S.past.slice(0,24);
   store.set("past",S.past);
+  S.sess.archivedSig=sessSig(S.sess);saveSess();   // so Start fresh won't save it twice
   if(n)n.value="";
   if(v)v.value="";
   toast("Saved"+(label?": "+label:"")+(notes?" · "+notes.slice(0,28):""));
@@ -2977,7 +3154,7 @@ function renderPast(){
   }).join("");
 }
 function newSession(){
-  if(Object.keys(S.sess.cam).length||S.sess.toeF!=null)archiveSession();
+  if(sessUnsaved())archiveSession();
   S.sess=blankSess();saveSess();
   toe.passes=[];store.set("toePasses2",[]);
   camUI();casUI();toeRender();renderResults();
@@ -3008,7 +3185,7 @@ function vehApply(){
   specLoad();floorStepsUI(0);floorStateUI();renderResults();
 }
 function vehChange(v){
-  if(S.sess&&S.sess.veh!==v&&(Object.keys(S.sess.cam).length||S.sess.toeF!=null)){archiveSession();S.sess=blankSess();}
+  if(S.sess&&S.sess.veh!==v&&sessHasData(S.sess)){if(sessUnsaved())archiveSession();S.sess=blankSess();}
   S.veh=v;store.set("veh",v);
   S.sess.veh=v;saveSess();
   toe.passes=[];store.set("toePasses2",[]);
@@ -3016,13 +3193,11 @@ function vehChange(v){
   toast("Now working on: "+prof().short);
 }
 
-/* ---------- wake lock ---------- */
-let wake=null;
-async function keepAwake(){
-  try{wake=await navigator.wakeLock.request("screen");
-    $("btnKeepAwake").textContent="Screen will stay awake ✓";
-    document.addEventListener("visibilitychange",async()=>{if(wake&&document.visibilityState==="visible"){try{wake=await navigator.wakeLock.request("screen");}catch(e){}}});
-  }catch(e){toast("Couldn’t grab a wake lock — bump Auto-Lock to 5 min in Settings → Display & Brightness");}
+/* ---------- wake lock button ---------- */
+async function keepAwakeButton(){
+  wakeManual=true;await keepAwake(true);
+  if(wakeLock&&!wakeLock.released)$("btnKeepAwake").textContent="Screen will stay awake ✓";
+  else{wakeManual=false;toast("Couldn’t grab a wake lock — set Auto-Lock to Never in Settings → Display & Brightness");}
 }
 
 /* ---------- live loop ---------- */
@@ -3270,7 +3445,7 @@ $("vehSel").addEventListener("change",e=>vehChange(e.target.value));
 $("btnVehAdd").addEventListener("click",()=>vehAddShow(true));
 $("btnVehCancel").addEventListener("click",()=>vehAddShow(false));
 $("btnVehSave").addEventListener("click",vehAddSave);
-$("btnVehDel").addEventListener("click",vehDelete);
+$("btnVehDel").addEventListener("click",e=>armConfirm(e.currentTarget,"Delete vehicle?",vehDelete));
 vehListUI();
 $("btnEnable").addEventListener("click",enableSensors);
 $("btnFlatCheck").addEventListener("click",flatCheck);
@@ -3285,6 +3460,7 @@ $("btnZeroGo").addEventListener("click",zeroRun);
 $("btnZeroReset").addEventListener("click",()=>{S.zero=null;store.set("zero",null);zeroFlow.step=0;zeroUI();$("zeroState").textContent="No gauge zero stored.";setChip("chipZero",false);});
 $("btnFloorGo").addEventListener("click",()=>floorRun("front"));
 $("btnFloorGoR").addEventListener("click",()=>floorRun("rear"));
+$("btnFloorGoP").addEventListener("click",()=>floorRun("pitch"));
 $("btnFloorStop").addEventListener("click",()=>{if(floorBusy){floorStop=true;}else{floorStepsUI(0);}});
 $("btnFloorZeroOut").addEventListener("click",floorZeroOut);
 $("barLen").addEventListener("change",()=>{
@@ -3296,10 +3472,10 @@ $("trackW").addEventListener("change",()=>{
   $("trackW").value=trackIn();floorStepsUI(0);floorStateUI();camUI();renderResults();
 });
 document.querySelectorAll("[data-camcap]").forEach(b=>b.addEventListener("click",()=>camCapture(b.dataset.camcap)));
-document.querySelectorAll("[data-camclr]").forEach(b=>b.addEventListener("click",()=>camClear(b.dataset.camclr)));
+document.querySelectorAll("[data-camclr]").forEach(b=>b.addEventListener("click",()=>armConfirm(b,"Clear?",()=>camClear(b.dataset.camclr))));
 $("btnCamSignL").addEventListener("click",()=>camSignFix("L"));
 $("btnCamSignR").addEventListener("click",()=>camSignFix("R"));
-document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click",()=>casClear(b.dataset.casclr)));
+document.querySelectorAll("[data-casclr]").forEach(b=>b.addEventListener("click",()=>armConfirm(b,"Clear?",()=>casClear(b.dataset.casclr))));
 $("btnCasL").addEventListener("click",()=>casterStart("LF"));
 $("btnCasR").addEventListener("click",()=>casterStart("RF"));
 $("btnCasAbort").addEventListener("click",casStopBtn);
@@ -3312,10 +3488,13 @@ casCalUI();
 $("sweepMode").value=S.sweepMode;
 $("sweepMode").addEventListener("change",()=>{S.sweepMode=$("sweepMode").value;store.set("sweepMode",S.sweepMode);casStepsUI();casModeNoteUI();handModeUI();});
 $("btnHandCap").addEventListener("click",handCapture);
-$("btnCasClearRuns").addEventListener("click",casClearRuns);
-$("btnCamClearRuns").addEventListener("click",camClearRuns);
+$("btnCasClearRuns").addEventListener("click",e=>armConfirm(e.currentTarget,"Clear ALL caster runs?",casClearRuns));
+$("btnCamClearRuns").addEventListener("click",e=>armConfirm(e.currentTarget,"Clear ALL camber readings?",camClearRuns));
 $("btnHandUndo").addEventListener("click",handUndo);
-$("btnHandStop").addEventListener("click",()=>{handAbort();toast("Stopped");});
+$("btnHandStop").addEventListener("click",e=>{
+  const stop=()=>{if(handAbort())toast("Stopped");};
+  if(hand.run&&(hand.pos*2+hand.leg)>0)armConfirm(e.currentTarget,"Discard run?",stop);else stop();
+});
 $("btnHandLF").addEventListener("click",()=>handStart("LF"));
 $("btnHandRF").addEventListener("click",()=>handStart("RF"));
 $("btnHandVoice").addEventListener("click",()=>{S.voiceOn=!S.voiceOn;store.set("voiceOn",S.voiceOn);casVoiceUI();if(!S.voiceOn)hush();});
@@ -3362,7 +3541,7 @@ $("btnToeModeA").addEventListener("click",()=>toeSetMode("all"));
 $("btnToeModeX").addEventListener("click",()=>toeSetMode("frame"));
 $("btnToeStart").addEventListener("click",toeStart);
 $("btnToeCap").addEventListener("click",toeCapture);
-$("btnToeReset").addEventListener("click",toeResetPasses);
+$("btnToeReset").addEventListener("click",e=>armConfirm(e.currentTarget,"Clear all passes?",toeResetPasses));
 document.addEventListener("click",e=>{const d=e.target.closest("[data-toedel]");if(d){toe.passes.splice(+d.dataset.toedel,1);store.set("toePasses2",toe.passes);toeRender();}});
 $("btnTapeAxF").addEventListener("click",()=>tapeSetAxle("front"));
 $("btnTapeAxR").addEventListener("click",()=>tapeSetAxle("rear"));
@@ -3375,7 +3554,7 @@ $("pastList").addEventListener("click",e=>{
   const i=+b.getAttribute("data-pastdel");
   S.past.splice(i,1);store.set("past",S.past);renderPast();toast("Deleted");
 });
-$("btnKeepAwake").addEventListener("click",keepAwake);
+$("btnKeepAwake").addEventListener("click",keepAwakeButton);
 for(const id in specMap)$(id).addEventListener("change",specSave);
 $("btnIntroEnable").addEventListener("click",()=>{store.set("introDone",true);$("intro").hidden=true;enableSensors();});
 $("btnIntroSkip").addEventListener("click",()=>{store.set("introDone",true);$("intro").hidden=true;});
