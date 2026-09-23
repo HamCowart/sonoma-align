@@ -159,6 +159,13 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
 
 #scr-setup details.card{scroll-margin-top:60px}
+
+.runw{margin-top:8px;font-weight:700;font-size:13px}
+.runrow{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.runrow .rtx{flex:1;min-width:0;font-size:13px}
+.runrow .btn{flex:none;font-size:12px;padding:4px 10px;min-width:44px}
+.runrow .btn.arm{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.runavg{padding:5px 0 2px;font-size:13px;color:var(--mut)}
 </style>
 
 <header>
@@ -381,7 +388,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
         <div class="wtile"><div class="wname">RR · rear</div><div class="wval mono" id="camRRv">–</div><div class="wsub" id="camRRs"></div><button class="btn" data-camcap="RR">Add reading</button><button class="btn ghost" style="padding:3px 8px;font-size:12px;margin-top:4px" data-camclr="RR">clear</button></div>
       </div>
       <details style="margin-top:10px" open><summary>Captures this session</summary><div class="dbody">
-        <div id="camRuns" class="small mono" style="white-space:pre-wrap">Nothing captured yet.</div>
+        <div id="camRuns" class="small">Nothing captured yet.</div>
         <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnCamClearRuns">Clear all camber readings</button></div>
       </div></details>
       <details style="margin-top:10px"><summary>How to hold it, and why three readings</summary><div class="dbody">
@@ -435,7 +442,7 @@ svg.diagram text{font-family:"IBM Plex Sans",sans-serif}
     </div>
 
     <details class="card" id="casRunsCard" open><summary>Captures this session</summary><div class="dbody">
-      <div id="casRuns" class="small mono" style="white-space:pre-wrap">Nothing captured yet.</div>
+      <div id="casRuns" class="small">Nothing captured yet.</div>
       <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="btnCasClearRuns">Clear all caster captures</button></div>
     </div></details>
 
@@ -2486,50 +2493,90 @@ function handFinish(){
    but only the mean was ever displayed, so a run that disagreed with the one
    before it was silently folded in instead of sitting there to be compared.
    Seeing "Capture 1: 4.2, Capture 2: 5.9" is the whole diagnosis. */
-function runsLines(){
-  const L=[];
-  for(const w of ["LF","RF"]){
-    const e=S.sess.cas[w];
-    if(!e||!e.sweeps||!e.sweeps.length)continue;
-    L.push(w);
-    e.sweeps.forEach((sw,i)=>{
-      L.push("  Capture "+(i+1)+"   caster "+fmt(sw.caster).padStart(6)+"°"+
-             "   SAI "+fmt(sw.sai).padStart(6)+"°"+
-             "   swing "+fmt(sw.thL,0)+"/"+fmt(sw.thR,0)+"°"+
-             (sw.rms!=null?"   misfit ±"+sw.rms.toFixed(2)+"°":"")+
-             (sw.src?"   "+sw.src:""));
-    });
-    if(e.sweeps.length>1){
-      const v=e.sweeps.map(x=>x.caster);
-      const mean=v.reduce((a,b)=>a+b,0)/v.length;
-      L.push("  — average "+fmt(mean)+"° over "+v.length+
-             ", spread "+(Math.max.apply(null,v)-Math.min.apply(null,v)).toFixed(2)+"°");
-    }
-    L.push("");
-  }
-  return L;
+/* Every capture on its own row with its own delete.
+
+   A single errant run -- bar slipped, level gate missed, fumbled steer -- is
+   obvious the moment it sits next to its neighbours ("4.0, 4.1, 7.8"), and it
+   should not cost the good ones. Each stored entry is a pure function of its
+   array (casStat(sweeps), camStat(samples)), so a delete is splice + recompute
+   through the SAME function: the average, scatter and tile all follow, and
+   nothing stale is left behind. An emptied wheel is removed outright.
+
+   Two taps to delete. The x arms on the first tap and fires on the second
+   (disarming after 3 s), because a phone held against a wheel is exactly
+   where a stray thumb lands. */
+function runRow(kind,w,i,text){
+  return '<div class="runrow"><span class="rtx">'+text+'</span>'+
+         '<button class="btn ghost" data-rundel="'+kind+'|'+w+'|'+i+'" title="Delete this capture">\u2715</button></div>';
 }
 function casRunsUI(){
   const el=$("casRuns"); if(!el)return;
-  const L=runsLines();
-  while(L.length&&L[L.length-1]==="")L.pop();
-  el.textContent=L.length?L.join(NLCH):"Nothing captured yet.";
+  let h="";
+  for(const w of ["LF","RF"]){
+    const e=S.sess.cas[w];
+    if(!e||!e.sweeps||!e.sweeps.length)continue;
+    h+='<div class="runw">'+w+'</div>';
+    e.sweeps.forEach((sw,i)=>{
+      h+=runRow("cas",w,i,
+        "Capture "+(i+1)+" \u00b7 <b>"+fmt(sw.caster)+"\u00b0</b>"+
+        " \u00b7 SAI "+fmt(sw.sai)+"\u00b0"+
+        " \u00b7 swing "+fmt(sw.thL,0)+"/"+fmt(sw.thR,0)+"\u00b0"+
+        /* Three positions solve three unknowns exactly, so a hand-held run's
+           misfit is ALWAYS 0.00 -- showing it would be false reassurance. What
+           does vary run to run is how level the heading captures were. */
+        (sw.nCap!=null&&sw.nCap<=3
+          ?(sw.worstLevel!=null?" \u00b7 level "+sw.worstLevel.toFixed(1)+"\u00b0"+(sw.worstLevel>HAND_LEVEL_TOL?" \u26a0":""):"")
+          :(sw.rms!=null?" \u00b7 misfit \u00b1"+sw.rms.toFixed(2)+"\u00b0":"")));
+    });
+    if(e.sweeps.length>1){
+      const v=e.sweeps.map(x=>x.caster);
+      h+='<div class="runavg">average <b>'+fmt(e.caster)+'\u00b0</b> over '+v.length+
+         ' \u00b7 spread '+(Math.max.apply(null,v)-Math.min.apply(null,v)).toFixed(2)+'\u00b0</div>';
+    }
+  }
+  el.innerHTML=h||"Nothing captured yet.";
 }
 function camRunsUI(){
   const el=$("camRuns"); if(!el)return;
-  const L=[];
+  let h="";
   for(const w of ["LF","RF","LR","RR"]){
     const e=S.sess.cam[w];
     if(!e||!e.samples||!e.samples.length)continue;
     const corr=camberCorrection(w);
-    const vals=e.samples.map((v,i)=>"#"+(i+1)+" "+fmt(v+corr));
-    L.push(w+"   "+vals.join("   "));
-    L.push("     average "+fmt(camVal(w))+"°"+
-           (e.sd!=null?"  · scatter ±"+e.sd.toFixed(2)+"°":"")+
-           "  · "+e.n+" reading"+(e.n>1?"s":""));
+    h+='<div class="runw">'+w+'</div>';
+    e.samples.forEach((v,i)=>{h+=runRow("cam",w,i,"Reading "+(i+1)+" \u00b7 <b>"+fmt(v+corr)+"\u00b0</b>");});
+    if(e.n>1)
+      h+='<div class="runavg">average <b>'+fmt(camVal(w))+'\u00b0</b> over '+e.n+
+         (e.sd!=null?' \u00b7 scatter \u00b1'+e.sd.toFixed(2)+'\u00b0':'')+'</div>';
   }
-  el.textContent=L.length?L.join(NLCH):"Nothing captured yet.";
+  el.innerHTML=h||"Nothing captured yet.";
 }
+function runDelete(kind,w,i){
+  if(kind==="cas"){
+    const e=S.sess.cas[w]; if(!e||!e.sweeps||!e.sweeps[i])return;
+    const left=e.sweeps.filter((_,k)=>k!==i);
+    if(left.length)S.sess.cas[w]=casStat(left);else delete S.sess.cas[w];
+    saveSess();casUI();casRunsUI();
+  }else{
+    const e=S.sess.cam[w]; if(!e||!e.samples||i>=e.samples.length)return;
+    const left=e.samples.filter((_,k)=>k!==i);
+    if(left.length)S.sess.cam[w]=camStat(left);else delete S.sess.cam[w];
+    saveSess();camUI();
+  }
+  renderResults();
+  toast("Deleted "+w+(kind==="cas"?" capture ":" reading ")+(i+1));
+}
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("[data-rundel]"); if(!b)return;
+  if(!b.classList.contains("arm")){
+    document.querySelectorAll("[data-rundel].arm").forEach(x=>{x.classList.remove("arm");x.textContent="\u2715";});
+    b.classList.add("arm");b.textContent="Delete?";
+    clearTimeout(b._t);b._t=setTimeout(()=>{b.classList.remove("arm");b.textContent="\u2715";},3000);
+    return;
+  }
+  const [kind,w,i]=b.getAttribute("data-rundel").split("|");
+  runDelete(kind,w,+i);
+});
 function casClearRuns(){
   for(const w of ["LF","RF"])delete S.sess.cas[w];
   saveSess();casUI();casRunsUI();renderResults();toast("All caster captures cleared");
@@ -2621,12 +2668,19 @@ function casUI(){
     const last=(m.sweeps&&m.sweeps.length)?m.sweeps[m.sweeps.length-1]:null;
     // A fitted run carries its own quality, so a single good run no longer
     // has to say "sweep again" when it already checked itself.
-    const fit=last&&last.rms!=null?last:null;
+    /* A hand-held run is 3 points for 3 unknowns: its misfit is identically
+       zero, so "captures agree well" would be said of EVERY run, good or
+       bad -- the same false reassurance as the original complaint. For those
+       the run-to-run spread (n>1) is the only honest consistency check, and
+       the level at the heading captures is the per-run quality signal. */
+    const exact=last&&last.nCap!=null&&last.nCap<=3;
+    const fit=last&&last.rms!=null&&!exact?last:null;
     const q=fit?(fit.rms<0.22?"captures agree well":fit.rms<0.40?"captures agree":"captures disagree — something moved, re-run")
               :(m.sd==null?"sweep again":(m.sd<0.25?"good":m.sd<0.6?"fair":"scattered — re-seat and repeat"));
     $("cas"+w+"s").innerHTML="n="+m.n+(m.sd!=null?" · ±"+m.sd.toFixed(2)+"° spread · ±"+m.se.toFixed(2)+"° avg":"")+" · "+q+
       (fit?"<br>"+(fit.nCap-1)+" captures · misfit ±"+fit.rms.toFixed(2)+"°"+(fit.fitSe!=null?" · fit ±"+fit.fitSe.toFixed(2)+"°":"")+
            " · "+(fit.cal?"angle from tape":(fit.src||"?"))+(fit.stopBad?" · <b>"+fit.stopBad+" short of the stop</b>":""):"")+
+      (exact?"<br>hand-held · level "+(last.worstLevel!=null?last.worstLevel.toFixed(1)+"°"+(last.worstLevel>HAND_LEVEL_TOL?" <b>⚠ over "+HAND_LEVEL_TOL+"°</b>":""):"–"):"")+
       "<br>"+(last?"swing "+fmt(last.thL,1)+"/"+fmt(last.thR,1)+"° · ":"")+"SAI≈"+(m.sai!=null?fmt(m.sai,1)+"°":"–");
   }
   const b=$("btnCasAbort");
